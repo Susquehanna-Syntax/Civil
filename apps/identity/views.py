@@ -5,7 +5,7 @@ hot path — it is consulted at login time only. Down Civil = no new logins;
 everything already logged in keeps working on the products' own sessions.
 """
 
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseBadRequest, JsonResponse
@@ -25,6 +25,32 @@ def pubkey(request):
     })
 
 
+def _redirect_allowed(redirect_uri: str, base: str) -> bool:
+    """Component-wise allowlist check — never a raw string prefix.
+
+    ``startswith`` on the whole URL is bypassable when the registered base
+    is a bare origin: ``https://app.example@evil.net/`` and
+    ``https://app.example.com.evil.net/`` both share the string prefix while
+    pointing the browser at an attacker's host. Compare parsed components:
+    scheme and host:port must match EXACTLY; only the path may extend, and
+    only at a ``/`` boundary. Traversal segments are rejected outright.
+    """
+    try:
+        got, want = urlparse(redirect_uri), urlparse(base)
+    except ValueError:
+        return False
+    if got.scheme != want.scheme or got.netloc != want.netloc or not got.netloc:
+        return False
+    if "@" in got.netloc:  # userinfo has no business in a callback URL
+        return False
+    if ".." in got.path.split("/"):
+        return False
+    base_path = want.path.rstrip("/")
+    return got.path == want.path or got.path == base_path or got.path.startswith(
+        base_path + "/"
+    )
+
+
 @require_GET
 @login_required
 def authorize(request):
@@ -42,7 +68,7 @@ def authorize(request):
     app = RegisteredApp.objects.filter(slug=slug, enabled=True).first()
     if app is None:
         return HttpResponseBadRequest(f"unknown or disabled app {slug!r}")
-    if not redirect_uri.startswith(app.redirect_base):
+    if not _redirect_allowed(redirect_uri, app.redirect_base):
         return HttpResponseBadRequest(
             "redirect_uri is not under this app's registered redirect base"
         )

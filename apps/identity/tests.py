@@ -91,6 +91,9 @@ class SsoAuthorizeTests(TestCase):
             "https://attacker.example.com/steal",
             "https://vigil.example.com.attacker.net/accounts/civil/callback",
             "http://vigil.example.com/accounts/civil/callback",  # scheme downgrade
+            "https://vigil.example.com@evil.net/accounts/civil/callback",  # userinfo
+            "https://vigil.example.com/accounts/civil/callback/../../steal",  # traversal
+            "https://vigil.example.com/accounts/civil/callbackevil",  # non-/ boundary
         ):
             resp = self.client.get("/sso/authorize",
                                    {"app": "vigil", "redirect_uri": bad})
