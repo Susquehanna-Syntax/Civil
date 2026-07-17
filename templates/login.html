@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Civil — sign in</title>
+  <style>
+    /* SQSY design language: flat, dark, pastel accents, no gradients. */
+    :root {
+      --surface: #1E1E2E; --card: #27273A; --text: #E6E6F0; --muted: #9C9CB0;
+      --sky: #89B4FA; --rose: #F38BA8; --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body {
+      background: var(--surface); color: var(--text);
+      font-family: "DM Sans", system-ui, sans-serif;
+      min-height: 100vh; display: grid; place-items: center;
+    }
+    .card {
+      background: var(--card); border-radius: var(--radius);
+      padding: 2.5rem; width: min(92vw, 380px);
+    }
+    h1 { font-size: 1.4rem; margin-bottom: .25rem; }
+    p.sub { color: var(--muted); font-size: .9rem; margin-bottom: 1.5rem; }
+    label { display: block; font-size: .85rem; color: var(--muted); margin: .8rem 0 .3rem; }
+    input {
+      width: 100%; padding: .65rem .8rem; border-radius: 8px;
+      border: 1px solid #3A3A52; background: var(--surface); color: var(--text);
+    }
+    input:focus { outline: 2px solid var(--sky); border-color: transparent; }
+    button {
+      margin-top: 1.4rem; width: 100%; padding: .7rem;
+      border: 0; border-radius: 8px; background: var(--sky); color: #14141F;
+      font-weight: 600; cursor: pointer;
+    }
+    .error { color: var(--rose); font-size: .85rem; margin-top: .8rem; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Civil</h1>
+    <p class="sub">One account for every SQSY app.</p>
+    <form method="post">
+      {% csrf_token %}
+      <label for="id_username">Username</label>
+      <input type="text" name="username" id="id_username" autofocus autocomplete="username" required>
+      <label for="id_password">Password</label>
+      <input type="password" name="password" id="id_password" autocomplete="current-password" required>
+      {% if form.errors %}<div class="error">Wrong username or password.</div>{% endif %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <button type="submit">Sign in</button>
+    </form>
+  </main>
+</body>
+</html>

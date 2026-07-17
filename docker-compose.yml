@@ -1,0 +1,20 @@
+# Civil — shared identity for the SQSY family. One small container.
+# The DB volume is the identity store AND holds Civil's JWT signing key;
+# back it up like you mean it.
+services:
+  civil:
+    build: .
+    image: sqsy/civil:2026.1.0
+    ports:
+      - "8100:8000"
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set DJANGO_SECRET_KEY in .env}
+      CIVIL_ALLOWED_HOSTS: ${CIVIL_ALLOWED_HOSTS:-*}
+      CIVIL_CSRF_TRUSTED_ORIGINS: ${CIVIL_CSRF_TRUSTED_ORIGINS:-}
+      CIVIL_DB_PATH: /data/db.sqlite3
+    volumes:
+      - civil_data:/data
+    restart: unless-stopped
+
+volumes:
+  civil_data:
