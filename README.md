@@ -35,6 +35,41 @@ working, monitoring never blinks. Civil is consulted at login time only.
 | `GET /api/v1/health/` | none | Liveness |
 | `/login/`, `/logout/`, `/admin/` | — | Humans |
 
+## Running it
+
+```bash
+# Docker (production-ish): set DJANGO_SECRET_KEY in .env first
+docker compose up -d          # serves on :8100, data + JWT key in the volume
+
+# Development
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+DJANGO_DEBUG=true .venv/bin/python manage.py migrate
+DJANGO_DEBUG=true .venv/bin/python manage.py createsuperuser
+DJANGO_DEBUG=true .venv/bin/python manage.py runserver
+
+# Tests
+DJANGO_DEBUG=true .venv/bin/python manage.py test
+```
+
+## Token contract (what apps verify)
+
+60-second EdDSA JWT, audience-bound to one registered app:
+
+```json
+{
+  "iss": "civil", "aud": "vigil",
+  "sub": "<stable user uuid>",
+  "preferred_username": "...", "email": "...", "name": "...",
+  "orgs": [{"id": "...", "slug": "..."}],
+  "iat": 0, "exp": 0
+}
+```
+
+Every SQSY app carries the same `civilsso` client app (Vigil, Jackil, Sigil,
+Turnstil): it verifies locally against the cached key, maps `sub` to a local
+account via a CivilIdentity row (local PKs never change, existing usernames
+are never auto-claimed), and runs its own normal Django session from there.
+
 ## Security notes
 
 - The JWT keypair is generated at Civil's first boot and lives in the DB —
