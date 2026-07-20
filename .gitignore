@@ -4,3 +4,8 @@ __pycache__/
 db.sqlite3
 staticfiles/
 .env
+.claude/
+CLAUDE.md
+REXYMCP.md
+.rexymcp/
+rexymcp.toml
