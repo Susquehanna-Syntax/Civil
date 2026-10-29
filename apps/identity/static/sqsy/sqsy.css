@@ -309,6 +309,50 @@ ul.checks label { display: flex; gap: .5rem; color: var(--text-1); font-size: .9
 .auth .field { margin: .9rem 0 0; }
 .auth .btn { width: 100%; margin-top: 1.4rem; }
 
+/* ── Motion (Jackil's curves: things rise into place, press down, and lift on hover) ── */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes rowIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes flashIn { from { opacity: 0; transform: translateY(-10px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes labelIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+.main-inner > *, .auth > .card { animation: fadeUp 0.6s var(--ease-out-expo) both; }
+.main-inner > :nth-child(2) { animation-delay: .05s; }
+.main-inner > :nth-child(3) { animation-delay: .1s; }
+.main-inner > :nth-child(4) { animation-delay: .15s; }
+.main-inner > :nth-child(n+5) { animation-delay: .2s; }
+.grid > * { animation: fadeUp 0.6s var(--ease-out-expo) both; animation-delay: .1s; }
+.grid > :nth-child(2) { animation-delay: .15s; }
+.grid > :nth-child(3) { animation-delay: .2s; }
+.grid > :nth-child(4) { animation-delay: .25s; }
+.grid > :nth-child(n+5) { animation-delay: .3s; }
+tbody tr { animation: rowIn 0.45s var(--ease-out-expo) both; animation-delay: .32s; }
+tbody tr:nth-child(1) { animation-delay: .12s; }
+tbody tr:nth-child(2) { animation-delay: .15s; }
+tbody tr:nth-child(3) { animation-delay: .18s; }
+tbody tr:nth-child(4) { animation-delay: .21s; }
+tbody tr:nth-child(5) { animation-delay: .24s; }
+tbody tr:nth-child(6) { animation-delay: .27s; }
+tbody tr:nth-child(7) { animation-delay: .3s; }
+td { transition: background 0.2s; }
+.main-inner > .flash { animation: flashIn 0.5s var(--ease-out-back, var(--ease-out-expo)) both; }
+a.card { transition: transform 0.5s var(--ease-out-expo), background 0.3s; }
+.stat { transition: background 0.3s; }
+a.card:hover { transform: translateY(-4px); }
+a.card:active { transform: translateY(-1px) scale(0.98); transition-duration: 0.12s; }
+.btn:hover { transform: translateY(-2px); }
+.btn:active { transform: translateY(0) scale(0.96); transition-duration: 0.1s; }
+input, textarea, select { transition: border-color 0.2s, background 0.3s var(--ease-out-expo); }
+input[type=text]:hover, input[type=email]:hover, input[type=number]:hover, input[type=date]:hover,
+input[type=search]:hover, input[type=password]:hover, input[type=url]:hover, textarea:hover, select:hover {
+  border-color: var(--text-3); }
+.pill { transition: background 0.3s, color 0.3s; }
+.layout { transition: grid-template-columns 0.35s var(--ease-out-expo); }
+.sidebar { transition: width 0.35s var(--ease-out-expo), padding 0.35s var(--ease-out-expo); }
+:root[data-sidebar="expanded"] .sidebar-label { animation: labelIn 0.35s var(--ease-out-expo) both; animation-delay: .08s; }
+/* Switching theme fades every colour across instead of snapping. */
+:root.theme-shift *, :root.theme-shift *::before, :root.theme-shift *::after {
+  transition: background-color 0.4s var(--ease-out-expo), color 0.4s var(--ease-out-expo),
+              border-color 0.4s var(--ease-out-expo), fill 0.4s, stroke 0.4s !important; }
+
 /* ── Phone: the sidebar becomes a bottom bar ── */
 @media (max-width: 720px) {
   .layout, :root[data-sidebar="expanded"] .layout { grid-template-columns: 1fr; }
@@ -323,7 +367,8 @@ ul.checks label { display: flex; gap: .5rem; color: var(--text-1); font-size: .9
   .page-head h1 { font-size: 1.6rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0s !important;
+    transition-duration: 0.01ms !important; }
 }
 
 /* Names the page templates use, mapped onto the tokens above. */
