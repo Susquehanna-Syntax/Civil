@@ -1,6 +1,6 @@
 {% extends "console/base.html" %}
 {% block title %}{% if org %}{{ org.name }}{% else %}Add organisation{% endif %}{% endblock %}
-{% block nav_orgs %}on{% endblock %}
+{% block nav_orgs %}active{% endblock %}
 {% block content %}
 <div class="page-head"><div><h1>{% if org %}Rename {{ org.name }}{% else %}Add organisation{% endif %}</h1></div></div>
 <form method="post" class="card" style="max-width:620px">

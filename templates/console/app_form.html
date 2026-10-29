@@ -1,6 +1,6 @@
 {% extends "console/base.html" %}
 {% block title %}{% if app %}{{ app.name }}{% else %}Add app{% endif %}{% endblock %}
-{% block nav_apps %}on{% endblock %}
+{% block nav_apps %}active{% endblock %}
 {% block content %}
 <div class="page-head"><div><h1>{% if app %}{{ app.name }}{% else %}Add app{% endif %}</h1>
 <p>Then, in the app, turn on Civil sign-in with this Civil's address and the same slug.</p></div></div>

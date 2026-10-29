@@ -1,6 +1,6 @@
 {% extends "console/base.html" %}
 {% block title %}{% if person %}{{ person.username }}{% else %}Add person{% endif %}{% endblock %}
-{% block nav_people %}on{% endblock %}
+{% block nav_people %}active{% endblock %}
 {% block style %}
   .two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }

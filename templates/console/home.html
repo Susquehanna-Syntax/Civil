@@ -1,13 +1,15 @@
 {% extends "console/base.html" %}
-{% block nav_home %}on{% endblock %}
+{% block nav_home %}active{% endblock %}
 {% block style %}
   .home { grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); align-items: start; }
   .apps { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
-  .app { display: block; color: var(--text); }
-  .app:hover { text-decoration: none; background: var(--raised); }
+  .app { display: block; color: var(--text-1); background: rgba(var(--rgb), var(--tint-a));
+         border-color: rgba(var(--rgb), var(--tint-a-line)); transition: background .2s, transform .3s var(--ease-out-expo); }
+  .app:hover { text-decoration: none; background: rgba(var(--rgb), var(--tint-a-hover)); transform: translateY(-2px); }
   .app .name { font-weight: 700; font-size: 1.1rem; }
   .app .addr { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
-  .app .go { color: var(--sky); font-weight: 600; margin-top: .8rem; display: block; }
+  .app .name { font-family: 'Fraunces', serif; font-weight: 500; font-size: 1.25rem; }
+  .app .go { color: var(--ink); font-weight: 600; margin-top: .8rem; display: block; }
   dl.facts { display: grid; grid-template-columns: auto 1fr; gap: .45rem 1rem; margin: 0; }
   dl.facts dt { color: var(--muted); }
   dl.facts dd { margin: 0; overflow-wrap: anywhere; }
@@ -24,7 +26,7 @@
     {% if apps %}
     <div class="grid apps">
       {% for a in apps %}
-      <a class="card app" href="{{ a.url }}">
+      <a class="card app {% cycle 'tc-sky' 'tc-lav' 'tc-mint' 'tc-peach' %}" href="{{ a.url }}">
         <div class="name">{{ a.app.name }}</div>
         <div class="addr">{{ a.url }}</div>
         <span class="go">Open {{ a.app.name }}</span>

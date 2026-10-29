@@ -1,16 +1,10 @@
 {% extends "console/base.html" %}
 {% block title %}Sign in{% endblock %}
-{% block style %}
-  main { min-height: 100vh; display: grid; place-items: center; }
-  .login { width: min(92vw, 380px); }
-  .login h1 { margin: 0 0 .2rem; font-size: 1.4rem; }
-  .login .field { margin: .9rem 0 0; }
-  .login .btn { width: 100%; justify-content: center; margin-top: 1.3rem; }
-{% endblock %}
-{% block content %}
-<div class="card login">
+{% block auth %}
+<div class="card">
+  <div class="mark">C</div>
   <h1>Civil</h1>
-  <p class="muted" style="margin:0">One account for every SQSY app.</p>
+  <p class="muted">One account for every SQSY app.</p>
   <form method="post">
     {% csrf_token %}
     <div class="field"><label for="id_username">Username</label>

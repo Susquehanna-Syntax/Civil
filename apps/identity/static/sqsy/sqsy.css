@@ -1,0 +1,331 @@
+/* SQSY design language, shared by Mercantil and Civil. The tokens and the
+   four themes are copied from Jackil static/css/style.css; keep them in step. */
+:root {
+  --bg: #1c1c21;
+  --s1: #232329;
+  --s2: #2a2a31;
+  --s3: #32323a;
+  --s4: #3a3a43;
+  --border: #3a3a43;
+  --text-1: #eae8e4;
+  --text-2: #a09ca6;
+  --text-3: #6e6b76;
+
+  /* Pastels — the surface and identity colours. */
+  --rose: #f2a0b8;
+  --lavender: #baa8e8;
+  --mint: #7eddb5;
+  --peach: #f0b888;
+  --sky: #82c4ee;
+  --lemon: #e2d478;
+  --coral: #f09080;
+
+  /* NEW: accent used as text or a thin line. On a dark ground the pastel
+     itself is legible, so these alias it; Paper swaps in deeper inks. */
+  --rose-ink: var(--rose);
+  --lavender-ink: var(--lavender);
+  --mint-ink: var(--mint);
+  --peach-ink: var(--peach);
+  --sky-ink: var(--sky);
+  --lemon-ink: var(--lemon);
+  --coral-ink: var(--coral);
+
+  --rgb-rose: 242,160,184;
+  --rgb-lavender: 186,168,232;
+  --rgb-mint: 126,221,181;
+  --rgb-peach: 240,184,136;
+  --rgb-sky: 130,196,238;
+  --rgb-lemon: 226,212,120;
+  --rgb-coral: 240,144,128;
+  --rgb-grey: 110,107,118;
+
+  --tint-a: 0.15;
+  --tint-a-line: 0.34;
+  --tint-a-hover: 0.24;
+
+  /* Chart slots — validated for colour-vision deficiency. Status slots are
+     reserved for run states; outcome slots go in fixed order. */
+  --st-ok: #2aa198;
+  --st-failed: #e0633a;
+  --st-pending: #9a7be8;
+  --st-na: #8a8793;
+  --st-skipped: #77747f;
+  --oc-1: #3598db;
+  --oc-2: #c96f2c;
+  --oc-3: #8f73e0;
+  --oc-4: #a38c1c;
+
+  --brand: var(--coral);
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* NEW: theme-dependent chrome that Vigil currently hard-codes. */
+  --on-accent: #1c1c21;
+  --glass: rgba(28, 28, 33, 0.78);
+  --glass-edge: rgba(255, 255, 255, 0.04);
+  --wash: rgba(255, 255, 255, 0.06);
+  --scrim: rgba(0, 0, 0, 0.6);
+  --grid-line: rgba(255, 255, 255, 0.05);
+
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 24px;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  /* NEW: modal motion, driven by the test bench below. */
+  --m-dur: 300ms;
+  --m-ease: var(--ease-out-expo);
+  --m-blur: 4px;
+
+  color-scheme: dark;
+}
+
+/* ── Paper (light). A warm #ede8bb ground instead of white: cards lift to a
+   paler cream, recesses sink to a deeper straw. Pastels stay pastel as
+   fills; text and lines switch to their -ink partners. ── */
+:root[data-theme="light"] {
+  --bg: #ede8bb;
+  --s1: #f7f3d6;
+  --s2: #e4dfae;
+  --s3: #d9d3a0;
+  --s4: #ccc592;
+  --border: #d3cd99;
+  --text-1: #23211a;
+  --text-2: #575340;
+  --text-3: #7c775a;
+
+  --rose-ink: #c0587a;
+  --lavender-ink: #7a62c4;
+  --mint-ink: #23845f;
+  --peach-ink: #b8733a;
+  --sky-ink: #3a86bd;
+  --lemon-ink: #8f7d14;
+  --coral-ink: #c2564a;
+
+  --rgb-grey: 124,119,90;
+  --tint-a: 0.30;
+  --tint-a-line: 0.60;
+  --tint-a-hover: 0.42;
+
+  --st-ok: #008f80;
+  --st-failed: #c4461f;
+  --st-pending: #7a5fd0;
+  --st-na: #8a8793;
+  --st-skipped: #a8a387;
+  --oc-1: #2a7fc0;
+  --oc-2: #b8621f;
+  --oc-3: #7a5fd0;
+  --oc-4: #8a7512;
+
+  --glass: rgba(237, 232, 187, 0.8);
+  --glass-edge: rgba(60, 52, 20, 0.08);
+  --wash: rgba(60, 52, 20, 0.07);
+  --scrim: rgba(58, 50, 18, 0.32);
+  --grid-line: rgba(60, 52, 20, 0.09);
+  color-scheme: light;
+}
+
+/* ── Ink (experimental). #100F0F, a warm near-black for OLED and dark rooms.
+   Surfaces step in smaller increments, so borders carry more of the
+   structure than they do in Dark. ── */
+:root[data-theme="ink"] {
+  --bg: #100f0f;
+  --s1: #191817;
+  --s2: #211f1e;
+  --s3: #2a2827;
+  --s4: #353231;
+  --border: #2e2c2a;
+  --text-1: #ece8e2;
+  --text-2: #a29d97;
+  --text-3: #6f6a65;
+  --rgb-grey: 111,106,101;
+  --tint-a: 0.13;
+  --tint-a-line: 0.30;
+  --tint-a-hover: 0.21;
+  --glass: rgba(16, 15, 15, 0.8);
+  --glass-edge: rgba(255, 255, 255, 0.05);
+  --wash: rgba(255, 255, 255, 0.05);
+  --scrim: rgba(0, 0, 0, 0.74);
+  --grid-line: rgba(255, 255, 255, 0.045);
+}
+
+/* ── River. A deep Susquehanna navy: the Dark recipe with the neutrals
+   pulled toward blue, so the pastels still pop. Chart slots reuse Dark's,
+   which validate on this surface too. ── */
+:root[data-theme="river"] {
+  --bg: #141c2b;
+  --s1: #1b2537;
+  --s2: #222d41;
+  --s3: #2b374d;
+  --s4: #354259;
+  --border: #2f3b52;
+  --text-1: #e8ecf3;
+  --text-2: #9ba6b9;
+  --text-3: #6c788d;
+  --rgb-grey: 108,120,141;
+  --tint-a: 0.15;
+  --tint-a-line: 0.34;
+  --tint-a-hover: 0.24;
+  --glass: rgba(20, 28, 43, 0.8);
+  --glass-edge: rgba(255, 255, 255, 0.05);
+  --wash: rgba(255, 255, 255, 0.06);
+  --scrim: rgba(5, 10, 20, 0.66);
+  --grid-line: rgba(255, 255, 255, 0.05);
+}
+
+
+/* ── Base ── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body { font: 15px/1.5 'DM Sans', system-ui, sans-serif; background: var(--bg); color: var(--text-1);
+       min-height: 100vh; transition: background 0.4s var(--ease-out-expo), color 0.4s var(--ease-out-expo); }
+a { color: var(--sky-ink); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, .mono { font-family: var(--font-mono); font-size: .85em; }
+h1, h2 { font-family: 'Fraunces', serif; font-weight: 500; letter-spacing: -.01em; }
+p { margin: 0; }
+
+/* ── Layout and sidebar (the same rail as Jackil and Vigil) ── */
+.layout { display: grid; grid-template-columns: 68px 1fr; min-height: 100vh; }
+.sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 68px; z-index: 100; display: flex;
+  flex-direction: column; align-items: center; padding: 20px 0; gap: 4px; background: var(--glass);
+  backdrop-filter: blur(32px); -webkit-backdrop-filter: blur(32px); border-right: 1px solid var(--glass-edge); }
+.sidebar-logo { width: 38px; height: 38px; background: var(--brand); border-radius: var(--r-sm);
+  margin-bottom: 24px; display: grid; place-items: center; font: 700 17px 'Fraunces', serif;
+  color: var(--on-accent); text-decoration: none; flex: none; transition: transform 0.5s var(--ease-out-expo); }
+.sidebar-logo:hover { transform: rotate(-8deg) scale(1.08); text-decoration: none; }
+.sidebar-icon { width: 42px; height: 42px; border-radius: var(--r-sm); display: grid; place-items: center;
+  cursor: pointer; color: var(--text-3); position: relative; text-decoration: none; border: 0;
+  background: none; font: inherit; flex: none;
+  transition: color 0.3s, background 0.3s var(--ease-out-expo), transform 0.4s var(--ease-out-expo); }
+.sidebar-icon:hover { background: var(--wash); color: var(--text-2); transform: scale(1.06); text-decoration: none; }
+.sidebar-icon:active { transform: scale(0.92); transition-duration: 0.1s; }
+.sidebar-icon.active { background: var(--mint); color: var(--on-accent); }
+.sidebar-icon svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.sidebar-spacer { flex: 1; }
+.sidebar-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--peach); display: grid;
+  place-items: center; font-size: 13px; font-weight: 600; color: var(--on-accent); text-decoration: none;
+  flex: none; margin: 4px 0; transition: transform 0.4s var(--ease-out-expo); }
+.sidebar-avatar:hover { transform: scale(1.1); text-decoration: none; }
+.sidebar-icon[data-tip]:hover::after { content: attr(data-tip); position: absolute; left: 54px;
+  background: var(--s3); color: var(--text-1); font-size: 12px; font-weight: 500; padding: 5px 12px;
+  border-radius: 8px; white-space: nowrap; pointer-events: none; animation: tooltipIn 0.3s var(--ease-out-expo) both; }
+@keyframes tooltipIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
+.sidebar form { display: contents; }
+.sidebar-label { display: none; }
+.sidebar-toggle svg { transition: transform 0.3s var(--ease-out-expo); }
+:root[data-sidebar="expanded"] .layout { grid-template-columns: 196px 1fr; }
+:root[data-sidebar="expanded"] .sidebar { width: 196px; align-items: stretch; padding: 20px 12px; overflow-y: auto; }
+:root[data-sidebar="expanded"] .sidebar-logo { margin-left: 2px; }
+:root[data-sidebar="expanded"] .sidebar-icon { width: auto; height: 38px; display: flex; align-items: center;
+  justify-content: flex-start; gap: 12px; padding: 0 11px; }
+:root[data-sidebar="expanded"] .sidebar-icon:hover { transform: none; }
+:root[data-sidebar="expanded"] .sidebar-label { display: block; font-size: 13px; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root[data-sidebar="expanded"] .sidebar-icon[data-tip]:hover::after { display: none; }
+:root[data-sidebar="expanded"] .sidebar-toggle svg { transform: rotate(180deg); }
+:root[data-sidebar="expanded"] .sidebar-avatar { margin-left: 4px; }
+.main { grid-column: 2; padding: 30px 40px 48px; min-width: 0; }
+.main-inner { max-width: 1600px; margin: 0 auto; }
+
+/* ── Page furniture ── */
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem;
+  flex-wrap: wrap; margin-bottom: 1.5rem; }
+.page-head h1 { font-size: 2rem; line-height: 1.15; }
+.page-head p { margin-top: .3rem; color: var(--text-2); }
+.card { background: var(--s1); border: 1px solid var(--border); border-radius: var(--r-md); padding: 1.25rem 1.4rem; }
+.card h2 { font-size: 1.15rem; margin-bottom: .9rem; }
+.grid { display: grid; gap: 1rem; }
+.grid > * { min-width: 0; }
+.stack { display: grid; gap: 1rem; }
+.stack > * { min-width: 0; }
+.stats { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin-bottom: 1rem; }
+.stat { background: rgba(var(--rgb, var(--rgb-grey)), var(--tint-a)); border-color: rgba(var(--rgb, var(--rgb-grey)), var(--tint-a-line)); }
+.stat .n { font: 500 2rem/1.1 'Fraunces', serif; color: var(--ink, var(--text-1)); }
+.stat .l { color: var(--text-2); font-size: .85rem; margin-top: .2rem; }
+.tc-rose { --rgb: var(--rgb-rose); --ink: var(--rose-ink); --fill: var(--rose); }
+.tc-lav { --rgb: var(--rgb-lavender); --ink: var(--lavender-ink); --fill: var(--lavender); }
+.tc-mint { --rgb: var(--rgb-mint); --ink: var(--mint-ink); --fill: var(--mint); }
+.tc-peach { --rgb: var(--rgb-peach); --ink: var(--peach-ink); --fill: var(--peach); }
+.tc-sky { --rgb: var(--rgb-sky); --ink: var(--sky-ink); --fill: var(--sky); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; padding: .55rem 1.05rem;
+  border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--s2); color: var(--text-1);
+  font: 600 .9rem 'DM Sans', system-ui, sans-serif; cursor: pointer; text-decoration: none;
+  transition: transform 0.3s var(--ease-out-expo), background 0.2s; }
+.btn:hover { text-decoration: none; background: var(--s3); }
+.btn:active { transform: scale(0.96); }
+.btn.primary { background: var(--mint); border-color: var(--mint); color: var(--on-accent); }
+.btn.primary:hover { filter: brightness(1.06); background: var(--mint); }
+.btn.danger { color: var(--rose-ink); }
+.btn.small { padding: .3rem .7rem; font-size: .8rem; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: .65rem .75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--text-3); font-weight: 700; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; }
+tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: var(--wash); }
+.table-wrap { overflow-x: auto; }
+
+.pill { display: inline-block; padding: .12rem .6rem; border-radius: 999px; font-size: .78rem; font-weight: 600;
+  white-space: nowrap; background: rgba(var(--rgb-grey), var(--tint-a)); color: var(--text-2); }
+.pill.green { background: rgba(var(--rgb-mint), var(--tint-a)); color: var(--mint-ink); }
+.pill.peach { background: rgba(var(--rgb-peach), var(--tint-a)); color: var(--peach-ink); }
+.pill.rose { background: rgba(var(--rgb-rose), var(--tint-a)); color: var(--rose-ink); }
+.pill.sky { background: rgba(var(--rgb-sky), var(--tint-a)); color: var(--sky-ink); }
+.muted { color: var(--text-2); }
+.warn { color: var(--peach-ink); }
+
+.flash { padding: .75rem 1rem; border-radius: var(--r-sm); margin-bottom: 1rem;
+  background: rgba(var(--rgb-mint), var(--tint-a)); border: 1px solid rgba(var(--rgb-mint), var(--tint-a-line)); }
+.flash.error { background: rgba(var(--rgb-rose), var(--tint-a)); border-color: rgba(var(--rgb-rose), var(--tint-a-line)); }
+
+label { display: block; font-size: .85rem; color: var(--text-2); margin-bottom: .3rem; }
+input[type=text], input[type=email], input[type=number], input[type=date], input[type=search],
+input[type=password], input[type=url], textarea, select {
+  width: 100%; padding: .6rem .8rem; border-radius: var(--r-sm); border: 1px solid var(--border);
+  background: var(--s2); color: var(--text-1); font: inherit; }
+input:focus, textarea:focus, select:focus { outline: 2px solid var(--sky-ink); outline-offset: 1px; border-color: transparent; }
+input[type=checkbox], input[type=radio] { accent-color: var(--mint-ink); width: 16px; height: 16px; }
+.help { color: var(--text-3); font-size: .8rem; margin-top: .3rem; }
+.errorlist { list-style: none; padding: 0; margin: .3rem 0 0; color: var(--rose-ink); font-size: .85rem; }
+.check { display: flex; gap: .55rem; align-items: flex-start; color: var(--text-1); font-size: .95rem; }
+.check input { margin-top: .2rem; flex: none; }
+.field { margin-bottom: 1rem; }
+.actions { display: flex; gap: .6rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap; }
+ul.checks { list-style: none; padding: 0; margin: 0; display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .4rem; }
+ul.checks label { display: flex; gap: .5rem; color: var(--text-1); font-size: .95rem; margin: 0; }
+
+/* ── Signed-out pages ── */
+.auth { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+.auth .card { width: min(100%, 400px); padding: 2rem; }
+.auth .mark { width: 46px; height: 46px; border-radius: var(--r-sm); background: var(--brand); display: grid;
+  place-items: center; font: 700 21px 'Fraunces', serif; color: var(--on-accent); margin-bottom: 1rem; }
+.auth h1 { font-size: 1.7rem; }
+.auth .field { margin: .9rem 0 0; }
+.auth .btn { width: 100%; margin-top: 1.4rem; }
+
+/* ── Phone: the sidebar becomes a bottom bar ── */
+@media (max-width: 720px) {
+  .layout, :root[data-sidebar="expanded"] .layout { grid-template-columns: 1fr; }
+  .sidebar, :root[data-sidebar="expanded"] .sidebar { top: auto; right: 0; bottom: 0; width: auto; height: 60px;
+    flex-direction: row; justify-content: space-around; align-items: center; padding: 0 8px; border-right: none;
+    border-top: 1px solid var(--glass-edge); overflow-x: auto; overflow-y: hidden; }
+  .sidebar-logo, .sidebar-spacer, .sidebar-toggle { display: none; }
+  .sidebar-label, :root[data-sidebar="expanded"] .sidebar-label { display: none; }
+  .sidebar-icon[data-tip]:hover::after { display: none; }
+  :root[data-sidebar="expanded"] .sidebar-icon { width: 42px; height: 42px; padding: 0; justify-content: center; }
+  .main { grid-column: 1; padding: 24px 16px 96px; }
+  .page-head h1 { font-size: 1.6rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* Names the page templates use, mapped onto the tokens above. */
+:root { --card: var(--s1); --raised: var(--s2); --line: var(--border); --text: var(--text-1);
+        --muted: var(--text-2); --green: var(--mint-ink); }
