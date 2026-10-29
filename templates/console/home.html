@@ -1,0 +1,53 @@
+{% extends "console/base.html" %}
+{% block nav_home %}on{% endblock %}
+{% block style %}
+  .home { grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); align-items: start; }
+  .apps { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  .app { display: block; color: var(--text); }
+  .app:hover { text-decoration: none; background: var(--raised); }
+  .app .name { font-weight: 700; font-size: 1.1rem; }
+  .app .addr { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+  .app .go { color: var(--sky); font-weight: 600; margin-top: .8rem; display: block; }
+  dl.facts { display: grid; grid-template-columns: auto 1fr; gap: .45rem 1rem; margin: 0; }
+  dl.facts dt { color: var(--muted); }
+  dl.facts dd { margin: 0; overflow-wrap: anywhere; }
+  @media (max-width: 900px) { .home { grid-template-columns: minmax(0, 1fr); } }
+{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Hello, {{ user.first_name|default:user.username }}</h1>
+  <p>Open an app and choose Sign in with Civil. You will not be asked for a password again.</p></div>
+</div>
+<div class="grid home">
+  <div class="card">
+    <h2>Your apps</h2>
+    {% if apps %}
+    <div class="grid apps">
+      {% for a in apps %}
+      <a class="card app" href="{{ a.url }}">
+        <div class="name">{{ a.app.name }}</div>
+        <div class="addr">{{ a.url }}</div>
+        <span class="go">Open {{ a.app.name }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}<p class="muted" style="margin:0">No apps use Civil yet.{% if user.is_staff %} <a href="{% url 'console-app-new' %}">Add one</a>.{% endif %}</p>{% endif %}
+  </div>
+  <div class="stack">
+    <div class="card">
+      <h2>Your account</h2>
+      <dl class="facts">
+        <dt>Username</dt><dd>{{ user.username }}</dd>
+        <dt>Name</dt><dd>{{ user.get_full_name|default:"-" }}</dd>
+        <dt>Email</dt><dd>{{ user.email|default:"-" }}</dd>
+      </dl>
+      <p style="margin:1rem 0 0"><a class="btn small" href="{% url 'password' %}">Change password</a></p>
+    </div>
+    <div class="card">
+      <h2>Organisations</h2>
+      {% for o in orgs %}<p style="margin:.2rem 0">{{ o.name }} <span class="muted">({{ o.site_count }} site{{ o.site_count|pluralize }})</span></p>
+      {% empty %}<p class="muted" style="margin:0">You are not in an organisation.</p>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

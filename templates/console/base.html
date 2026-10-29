@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Home{% endblock %} · Civil</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #1E1E2E; --card: #27273A; --raised: #313147; --line: #3A3A52;
+      --text: #E6E6F0; --muted: #9C9CB0;
+      --sky: #89B4FA; --green: #A6E3A1; --peach: #FAB387; --rose: #F38BA8; --mauve: #CBA6F7;
+      --on-accent: #14141F; --radius: 12px;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #EFF1F5; --card: #FFFFFF; --raised: #E6E9EF; --line: #CCD0DA;
+        --text: #2E3047; --muted: #6C6F85;
+        --sky: #1E66F5; --green: #40A02B; --peach: #D9661A; --rose: #D20F39; --mauve: #8839EF;
+        --on-accent: #FFFFFF;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text);
+           font: 15px/1.5 "DM Sans", system-ui, sans-serif; }
+    a { color: var(--sky); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code, .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .85em; }
+
+    header.top { display: flex; align-items: center; gap: 1.5rem; padding: .9rem 1.5rem;
+                 background: var(--card); border-bottom: 1px solid var(--line); }
+    header.top .brand { font-weight: 700; font-size: 1.05rem; color: var(--text); }
+    header.top .brand span { color: var(--muted); font-weight: 500; }
+    header.top nav { display: flex; gap: 1rem; flex: 1; }
+    header.top nav a { color: var(--muted); }
+    header.top nav a.on { color: var(--text); font-weight: 600; }
+    header.top .who { color: var(--muted); font-size: .9rem; display: flex; gap: .8rem; align-items: center; }
+
+    main { padding: 1.5rem; max-width: 1600px; margin: 0 auto; }
+    .page-head { display: flex; align-items: flex-end; justify-content: space-between;
+                 gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+    .page-head h1 { margin: 0; font-size: 1.5rem; }
+    .page-head p { margin: .2rem 0 0; color: var(--muted); }
+
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+            padding: 1.25rem; }
+    .card h2 { margin: 0 0 .9rem; font-size: 1rem; }
+    .grid { display: grid; gap: 1rem; }
+    .grid > * { min-width: 0; }
+    .stack { display: grid; gap: 1rem; }
+    .stack > * { min-width: 0; }
+    .field { margin-bottom: 1rem; }
+    .actions { display: flex; gap: .6rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap; }
+    ul.checks { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .4rem; }
+    ul.checks label { display: flex; gap: .5rem; color: var(--text); font-size: .95rem; margin: 0; }
+    select { width: 100%; padding: .55rem .7rem; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; }
+    .stats { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin-bottom: 1rem; }
+    .stat .n { font-size: 1.6rem; font-weight: 700; }
+    .stat .l { color: var(--muted); font-size: .85rem; }
+
+    .btn { display: inline-flex; align-items: center; gap: .4rem; padding: .55rem 1rem;
+           border-radius: 8px; border: 1px solid var(--line); background: var(--raised);
+           color: var(--text); font: 600 .9rem "DM Sans", system-ui, sans-serif; cursor: pointer; }
+    .btn:hover { text-decoration: none; filter: brightness(1.08); }
+    .btn.primary { background: var(--sky); border-color: var(--sky); color: var(--on-accent); }
+    .btn.danger { color: var(--rose); }
+    .btn.small { padding: .3rem .7rem; font-size: .8rem; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: .6rem .7rem; border-bottom: 1px solid var(--line);
+             vertical-align: top; }
+    th { color: var(--muted); font-weight: 500; font-size: .8rem; text-transform: uppercase;
+         letter-spacing: .04em; }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:hover td { background: var(--raised); }
+    .table-wrap { overflow-x: auto; }
+
+    .pill { display: inline-block; padding: .1rem .55rem; border-radius: 999px; font-size: .78rem;
+            font-weight: 600; background: var(--raised); color: var(--muted); white-space: nowrap; }
+    .pill.green { background: color-mix(in srgb, var(--green) 18%, transparent); color: var(--green); }
+    .pill.peach { background: color-mix(in srgb, var(--peach) 18%, transparent); color: var(--peach); }
+    .pill.rose { background: color-mix(in srgb, var(--rose) 18%, transparent); color: var(--rose); }
+    .pill.sky { background: color-mix(in srgb, var(--sky) 18%, transparent); color: var(--sky); }
+    .muted { color: var(--muted); }
+    .warn { color: var(--peach); }
+
+    .flash { padding: .75rem 1rem; border-radius: 8px; margin-bottom: 1rem;
+             background: color-mix(in srgb, var(--green) 15%, var(--card)); }
+    .flash.error { background: color-mix(in srgb, var(--rose) 15%, var(--card)); }
+
+    label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }
+    input[type=text], input[type=email], input[type=number], input[type=date], input[type=search],
+    input[type=password], textarea {
+      width: 100%; padding: .6rem .75rem; border-radius: 8px; border: 1px solid var(--line);
+      background: var(--bg); color: var(--text); font: inherit; }
+    input:focus, textarea:focus { outline: 2px solid var(--sky); border-color: transparent; }
+    .help { color: var(--muted); font-size: .8rem; margin-top: .25rem; }
+    .errorlist { list-style: none; padding: 0; margin: .3rem 0 0; color: var(--rose); font-size: .85rem; }
+    .check { display: flex; gap: .5rem; align-items: flex-start; color: var(--text); font-size: .95rem; }
+    .check input { margin-top: .3rem; }
+
+    @media (max-width: 700px) {
+      header.top { flex-wrap: wrap; padding: .8rem 1rem; }
+      main { padding: 1rem; }
+    }
+    {% block style %}{% endblock %}
+  </style>
+</head>
+<body>
+  {% if user.is_authenticated %}
+  <header class="top">
+    <a class="brand" href="{% url 'home' %}">Civil <span>Accounts</span></a>
+    <nav>
+      <a href="{% url 'home' %}" class="{% block nav_home %}{% endblock %}">Home</a>
+      {% if user.is_staff %}
+      <a href="{% url 'console-people' %}" class="{% block nav_people %}{% endblock %}">People</a>
+      <a href="{% url 'console-apps' %}" class="{% block nav_apps %}{% endblock %}">Apps</a>
+      <a href="{% url 'console-orgs' %}" class="{% block nav_orgs %}{% endblock %}">Organisations</a>
+      <a href="{% url 'admin:index' %}">Admin</a>
+      {% endif %}
+    </nav>
+    <div class="who">
+      <a href="{% url 'password' %}">{{ user.get_username }}</a>
+      <form method="post" action="{% url 'logout' %}">{% csrf_token %}
+        <button class="btn small" type="submit">Sign out</button></form>
+    </div>
+  </header>
+  {% endif %}
+  <main>
+    {% for m in messages %}<div class="flash {% if m.level_tag == 'error' %}error{% endif %}">{{ m }}</div>{% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+  {% block script %}{% endblock %}
+</body>
+</html>

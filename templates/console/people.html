@@ -1,0 +1,27 @@
+{% extends "console/base.html" %}
+{% block title %}People{% endblock %}
+{% block nav_people %}on{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>People</h1><p>Everyone who can sign in with Civil. What they may do in each app is set in that app.</p></div>
+  <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+    <form method="get"><input type="search" name="q" value="{{ q }}" placeholder="Search name, username or email" style="min-width:min(260px, 100%)"></form>
+    {% if perms.identity.add_user %}<a class="btn primary" href="{% url 'console-person-new' %}">Add person</a>{% endif %}
+  </div>
+</div>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Username</th><th>Name</th><th>Email</th><th>Organisations</th><th>Status</th><th>Last sign-in</th></tr></thead>
+  <tbody>
+  {% for u in users %}
+    <tr>
+      <td>{% if perms.identity.change_user %}<a href="{% url 'console-person' u.pk %}"><strong>{{ u.username }}</strong></a>{% else %}<strong>{{ u.username }}</strong>{% endif %}</td>
+      <td>{{ u.get_full_name|default:"-" }}</td>
+      <td>{{ u.email|default:"-" }}</td>
+      <td>{% for m in u.memberships.all %}{{ m.org.name }}{% if not forloop.last %}, {% endif %}{% empty %}<span class="muted">None</span>{% endfor %}</td>
+      <td>{% if not u.is_active %}<span class="pill rose">Cannot sign in</span>{% elif u.is_superuser %}<span class="pill sky">Superuser</span>{% elif u.is_staff %}<span class="pill sky">Staff</span>{% else %}<span class="pill green">Active</span>{% endif %}</td>
+      <td>{{ u.last_login|date:"j M Y, H:i"|default:"Never" }}</td>
+    </tr>
+  {% empty %}<tr><td colspan="6" class="muted">{% if q %}Nobody matches "{{ q }}".{% else %}Nobody yet.{% endif %}</td></tr>{% endfor %}
+  </tbody>
+</table></div></div>
+{% endblock %}

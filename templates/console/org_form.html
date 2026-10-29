@@ -1,0 +1,11 @@
+{% extends "console/base.html" %}
+{% block title %}{% if org %}{{ org.name }}{% else %}Add organisation{% endif %}{% endblock %}
+{% block nav_orgs %}on{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{% if org %}Rename {{ org.name }}{% else %}Add organisation{% endif %}</h1></div></div>
+<form method="post" class="card" style="max-width:620px">
+  {% csrf_token %}
+  {% for f in form %}{% include "console/_field.html" %}{% endfor %}
+  <div class="actions"><a class="btn" href="{% if org %}{% url 'console-org' org.pk %}{% else %}{% url 'console-orgs' %}{% endif %}">Cancel</a><button class="btn primary" type="submit">Save</button></div>
+</form>
+{% endblock %}

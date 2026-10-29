@@ -1,0 +1,23 @@
+{% extends "console/base.html" %}
+{% block title %}Apps{% endblock %}
+{% block nav_apps %}on{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Apps</h1><p>The apps allowed to sign people in with Civil. Civil sends a sign-in only to an app's own callback address.</p></div>
+  {% if perms.identity.add_registeredapp %}<a class="btn primary" href="{% url 'console-app-new' %}">Add app</a>{% endif %}
+</div>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>App</th><th>Slug</th><th>Callback address</th><th>Sign-ins</th><th></th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td>{% if perms.identity.change_registeredapp %}<a href="{% url 'console-app' r.app.pk %}"><strong>{{ r.app.name }}</strong></a>{% else %}<strong>{{ r.app.name }}</strong>{% endif %}<div class="muted" style="font-size:.85rem">{{ r.url }}</div></td>
+      <td><code>{{ r.app.slug }}</code></td>
+      <td><code>{{ r.app.redirect_base }}</code></td>
+      <td>{% if r.app.enabled %}<span class="pill green">Allowed</span>{% else %}<span class="pill rose">Stopped</span>{% endif %}</td>
+      <td style="text-align:right">{% if perms.identity.change_registeredapp %}<form method="post" action="{% url 'console-app-toggle' r.app.pk %}">{% csrf_token %}<button class="btn small{% if r.app.enabled %} danger{% endif %}" type="submit">{% if r.app.enabled %}Stop sign-ins{% else %}Allow sign-ins{% endif %}</button></form>{% endif %}</td>
+    </tr>
+  {% empty %}<tr><td colspan="5" class="muted">No apps yet.</td></tr>{% endfor %}
+  </tbody>
+</table></div></div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "console/base.html" %}
+{% block title %}{% if person %}{{ person.username }}{% else %}Add person{% endif %}{% endblock %}
+{% block nav_people %}on{% endblock %}
+{% block style %}
+  .two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 900px) { .two, .row2 { grid-template-columns: minmax(0, 1fr); } }
+{% endblock %}
+{% block content %}
+<div class="page-head"><div>
+  <h1>{% if person %}{{ person.username }}{% else %}Add person{% endif %}</h1>
+  <p>{% if editing_self %}This is you, so you cannot turn off your own sign-in or staff access here.{% elif person %}Changes apply at their next sign-in to each app.{% else %}They can sign in to every app that uses Civil.{% endif %}</p>
+</div></div>
+<form method="post">
+  {% csrf_token %}
+  <div class="grid two">
+    <div class="card">
+      <h2>Account</h2>
+      {% with f=form.username %}{% include "console/_field.html" %}{% endwith %}
+      <div class="row2">
+        {% with f=form.first_name %}{% include "console/_field.html" %}{% endwith %}
+        {% with f=form.last_name %}{% include "console/_field.html" %}{% endwith %}
+      </div>
+      {% with f=form.email %}{% include "console/_field.html" %}{% endwith %}
+      {% with f=form.password %}{% include "console/_field.html" %}{% endwith %}
+    </div>
+    <div class="stack">
+      <div class="card">
+        <h2>Access</h2>
+        {% if form.is_active %}{% with f=form.is_active %}{% include "console/_field.html" %}{% endwith %}{% endif %}
+        {% if form.is_staff %}{% with f=form.is_staff %}{% include "console/_field.html" %}{% endwith %}{% endif %}
+        {% if not form.is_active and not form.is_staff %}<p class="muted" style="margin:0">Nothing to change here.</p>{% endif %}
+      </div>
+      <div class="card">
+        <h2>Organisations</h2>
+        <ul class="checks">{% for box in form.orgs %}<li><label>{{ box.tag }} {{ box.choice_label }}</label></li>{% empty %}<li class="muted">No organisations yet.</li>{% endfor %}</ul>
+        {{ form.orgs.errors }}
+      </div>
+    </div>
+  </div>
+  <div class="actions"><a class="btn" href="{% url 'console-people' %}">Cancel</a><button class="btn primary" type="submit">Save</button></div>
+</form>
+{% endblock %}

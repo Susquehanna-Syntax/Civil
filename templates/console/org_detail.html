@@ -1,0 +1,49 @@
+{% extends "console/base.html" %}
+{% block title %}{{ org.name }}{% endblock %}
+{% block nav_orgs %}on{% endblock %}
+{% block style %}
+  .two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .inline { display: flex; gap: .6rem; align-items: flex-end; flex-wrap: wrap; margin-top: 1rem; }
+  .inline > div { flex: 1; min-width: 160px; }
+  .inline .field { margin: 0; }
+  @media (max-width: 900px) { .two { grid-template-columns: minmax(0, 1fr); } }
+{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ org.name }}</h1><p><code>{{ org.slug }}</code>, added {{ org.created_at|date:"j M Y" }}</p></div>
+  {% if can_change %}<a class="btn" href="{% url 'console-org-edit' org.pk %}">Rename</a>{% endif %}
+</div>
+<div class="grid two">
+  <div class="card">
+    <h2>People</h2>
+    <table><tbody>
+    {% for m in members %}
+      <tr><td><strong>{{ m.user.username }}</strong> <span class="muted">{{ m.user.get_full_name }}</span></td>
+          <td style="text-align:right">{% if can_change %}<form method="post" action="{% url 'console-member-remove' org.pk m.user.pk %}">{% csrf_token %}<button class="btn small danger" type="submit">Remove</button></form>{% endif %}</td></tr>
+    {% empty %}<tr><td class="muted">Nobody yet.</td></tr>{% endfor %}
+    </tbody></table>
+    {% if can_change and others %}
+    <form method="post" action="{% url 'console-member-add' org.pk %}" class="inline">{% csrf_token %}
+      <div><label for="add-user">Add a person</label><select id="add-user" name="user">{% for u in others %}<option value="{{ u.pk }}">{{ u.username }}{% if u.get_full_name %} ({{ u.get_full_name }}){% endif %}</option>{% endfor %}</select></div>
+      <button class="btn primary" type="submit">Add</button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="card">
+    <h2>Sites</h2>
+    <table><tbody>
+    {% for s in sites %}
+      <tr><td><strong>{{ s.name }}</strong> <code class="muted">{{ s.slug }}</code></td>
+          <td style="text-align:right">{% if perms.identity.delete_site %}<form method="post" action="{% url 'console-site-delete' org.pk s.pk %}" onsubmit="return confirm('Delete the site {{ s.name|escapejs }}?')">{% csrf_token %}<button class="btn small danger" type="submit">Delete</button></form>{% endif %}</td></tr>
+    {% empty %}<tr><td class="muted">No sites yet.</td></tr>{% endfor %}
+    </tbody></table>
+    {% if perms.identity.add_site %}
+    <form method="post" class="inline">{% csrf_token %}
+      <div>{% with f=site_form.name %}{% include "console/_field.html" %}{% endwith %}</div>
+      <div>{% with f=site_form.slug %}{% include "console/_field.html" %}{% endwith %}</div>
+      <button class="btn primary" type="submit">Add site</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
