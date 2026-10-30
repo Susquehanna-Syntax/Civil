@@ -251,7 +251,7 @@ def codes(request):
     if not (request.user.is_authenticated and fresh and owner == str(request.user.pk)):
         for key in (FRESH_CODES_KEY, AFTER_CODES_KEY):
             request.session.pop(key, None)
-        return redirect("mfa:security" if request.user.is_authenticated else "login")
+        return redirect("mfa:security" if request.user.is_authenticated else conf.login_url())
     if request.method == "POST":
         request.session.pop(FRESH_CODES_KEY, None)
         after = request.session.pop(AFTER_CODES_KEY, None)
