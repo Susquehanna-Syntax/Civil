@@ -345,3 +345,50 @@ class RecoveryCodeTests(TestCase):
         self.assertNotEqual(first, second)
         self.assertFalse(use_code(self.user, first))
         self.assertTrue(use_code(self.user, second))
+
+
+class BypassRegressionTests(TestCase):
+    """The setup and codes pages must never stand in for the second factor."""
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("dave", password=STRONG)
+        enroll(self.user)
+
+    def signed_in(self):
+        return "_auth_user_id" in self.client.session._session
+
+    def test_password_alone_cannot_enrol_a_new_authenticator(self):
+        """The critical one: a pending user with a factor goes to setup, gets a
+        fresh secret, confirms it with their own app, and is signed in."""
+        self.client.post(reverse("login"), {"username": "dave", "password": STRONG})
+        resp = self.client.get(reverse("mfa:setup"))
+        self.assertRedirects(resp, reverse("mfa:verify"), fetch_redirect_response=False)
+        self.assertNotIn(views.ENROL_KEY, self.client.session._session)
+        resp = self.client.post(reverse("mfa:setup"), {"code": "123456"})
+        self.assertFalse(self.signed_in())
+        self.assertEqual(MfaProfile.objects.get(user=self.user).totp_secret, SECRET)
+
+    def test_signed_in_user_cannot_replace_the_authenticator_without_a_code(self):
+        self.client.force_login(self.user)
+        resp = self.client.get(reverse("mfa:setup"))
+        self.assertRedirects(resp, reverse("mfa:security"), fetch_redirect_response=False)
+        self.assertNotIn(views.ENROL_KEY, self.client.session._session)
+
+    def test_codes_page_never_signs_anyone_in(self):
+        self.client.post(reverse("login"), {"username": "dave", "password": STRONG})
+        session = self.client.session
+        session[views.FRESH_CODES_KEY] = ["aaaaa-bbbbb"]
+        session[views.OWNER_KEY] = str(self.user.pk)
+        session.save()
+        resp = self.client.post(reverse("mfa:codes"))
+        self.assertFalse(self.signed_in())
+        self.assertNotEqual(resp.status_code, 200)
+
+    def test_a_new_password_step_forgets_old_codes_and_secrets(self):
+        session = self.client.session
+        session[views.FRESH_CODES_KEY] = ["aaaaa-bbbbb"]
+        session[views.ENROL_KEY] = "JBSWY3DPEHPK3PXP"
+        session.save()
+        self.client.post(reverse("login"), {"username": "dave", "password": STRONG})
+        for key in (views.FRESH_CODES_KEY, views.ENROL_KEY, views.OWNER_KEY):
+            self.assertNotIn(key, self.client.session._session)

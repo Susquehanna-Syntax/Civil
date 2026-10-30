@@ -42,6 +42,9 @@ PENDING_KEY = "mfa_pending"
 ENROL_KEY = "mfa_enrol_secret"
 FRESH_CODES_KEY = "mfa:fresh_codes"
 AFTER_CODES_KEY = "mfa:after_codes"
+#: Whose fresh recovery codes and enrolment secret these are. Both are only
+#: ever honoured for that same signed-in user.
+OWNER_KEY = "mfa:owner"
 #: Long enough to find a phone; short enough that a password typed on a shared
 #: machine and walked away from does not stay half signed in.
 PENDING_SECONDS = 300
@@ -58,7 +61,8 @@ def safe_next(request, candidate: str) -> str:
 
 def begin(request, user, next_url: str = "/", backend: str = ""):
     """Park ``user`` as pending and send the browser to the second step."""
-    request.session.pop(ENROL_KEY, None)
+    for key in (ENROL_KEY, FRESH_CODES_KEY, AFTER_CODES_KEY, OWNER_KEY):
+        request.session.pop(key, None)
     request.session[PENDING_KEY] = {
         "uid": str(user.pk),
         "exp": time.time() + PENDING_SECONDS,
@@ -131,27 +135,20 @@ def verify(request):
 
 
 def codes(request):
-    """The fresh recovery codes — shown once, then gone from the session."""
+    """The fresh recovery codes — shown once, to the signed-in user they were
+    made for, then gone from the session. This page never signs anyone in:
+    by the time codes exist, the code that made them has already done that."""
     fresh = request.session.get(FRESH_CODES_KEY)
-    user, _state = _pending(request)
-    if not fresh:
-        return redirect("mfa:verify" if user else "home")
+    owner = request.session.get(OWNER_KEY)
+    if not (request.user.is_authenticated and fresh and owner == str(request.user.pk)):
+        for key in (FRESH_CODES_KEY, AFTER_CODES_KEY):
+            request.session.pop(key, None)
+        return redirect("mfa:security" if request.user.is_authenticated else "login")
     if request.method == "POST":
         request.session.pop(FRESH_CODES_KEY, None)
         after = request.session.pop(AFTER_CODES_KEY, None)
-        if user is None:
-            return redirect(after or "mfa:security")
-        # Codes alone don't sign anyone in — except when reading them *is* what
-        # finished the step: an account that enrolled on its way through has
-        # already answered with the enrolment code, and its pending state is
-        # still parked. Sign that one in here, at the last click.
-        return redirect(_finish(request, user, _state))
-
-    return render(
-        request,
-        "mfa/codes.html",
-        {"codes": fresh, "pending": user is not None},
-    )
+        return redirect(after or "mfa:security")
+    return render(request, "mfa/codes.html", {"codes": fresh, "pending": False})
 
 
 class MfaLoginView(auth_views.LoginView):
@@ -194,10 +191,13 @@ def security(request):
         if action == "codes":
             if _confirmed_for_post(request, user):
                 request.session[FRESH_CODES_KEY] = recovery.make_codes(user)
+                request.session[OWNER_KEY] = str(user.pk)
                 return redirect("mfa:codes")
         elif action == "setup" and _confirmed_for_post(request, user):
-            # The old secret stays until the new one checks out on setup.
+            # The old secret stays until the new one checks out on setup, and
+            # this secret is only good for this signed-in user.
             request.session[ENROL_KEY] = generate_secret()
+            request.session[OWNER_KEY] = str(user.pk)
             return redirect("mfa:setup")
 
     return render(
@@ -218,16 +218,24 @@ def setup(request):
     still waits for a code from the authenticator that was just enrolled.
     """
     if request.user.is_authenticated:
+        # Replacing an authenticator: only after the security page checked a
+        # current code and handed this user a secret. Never on demand.
         user, state = request.user, None
+        secret = request.session.get(ENROL_KEY)
+        if not secret or request.session.get(OWNER_KEY) != str(user.pk):
+            return redirect("mfa:security")
     else:
         user, state = _pending(request)
-    if user is None:
-        return redirect("login")
-
-    secret = request.session.get(ENROL_KEY)
-    if not secret:
-        secret = generate_secret()
-        request.session[ENROL_KEY] = secret
+        if user is None:
+            return redirect("login")
+        # A password alone may enrol only an account that has no factor at
+        # all; one that has a factor must use it.
+        if has_second_factor(user):
+            return redirect("mfa:verify")
+        secret = request.session.get(ENROL_KEY)
+        if not secret:
+            secret = generate_secret()
+            request.session[ENROL_KEY] = secret
 
     error = None
     if request.method == "POST":
@@ -242,6 +250,7 @@ def setup(request):
                 after = _finish(request, user, state)
             request.session[FRESH_CODES_KEY] = codes
             request.session[AFTER_CODES_KEY] = after
+            request.session[OWNER_KEY] = str(user.pk)
             messages.success(request, "Authenticator set up.")
             return redirect("mfa:codes")
 
