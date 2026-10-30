@@ -660,3 +660,28 @@ class ModelTests(TestCase):
         key = key_fixture(user, name="NFC tag")
         self.assertEqual(str(key), f"key 'NFC tag' <user {user.pk}>")
         self.assertEqual(list(SecurityKey.objects.filter(user=user)), [key])
+
+
+class OriginPinTests(KeyTestCase):
+    def test_assertion_origin_is_the_configured_one_whatever_the_origin_header_says(self):
+        user = get_user_model().objects.create_user("wa-oscar", password=STRONG)
+        enroll(user)
+        key_fixture(user)
+        self.client.force_login(user)
+        seen = {}
+
+        def fake_verify(**kwargs):
+            seen["origin"] = kwargs["expected_origin"]
+            return _VerifiedAuthentication
+
+        with self.settings(**KEYS):
+            self.post(f"{reverse('mfa:verify-key-options')}?confirm=1", {}, status=200)
+            with mock.patch.object(keys, "verify_authentication_response", side_effect=fake_verify):
+                self.client.post(
+                    f"{reverse('mfa:verify-key')}?confirm=1",
+                    json.dumps({"credential": credential(
+                        ceremony="get", challenge=self.challenge(keys.AUTH_SESSION_KEY))}),
+                    content_type="application/json",
+                    HTTP_ORIGIN="https://evil.example",
+                )
+        self.assertEqual(seen["origin"], PUBLIC_URL)
