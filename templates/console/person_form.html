@@ -36,6 +36,14 @@
         <ul class="checks">{% for box in form.orgs %}<li><label>{{ box.tag }} {{ box.choice_label }}</label></li>{% empty %}<li class="muted">No organisations yet.</li>{% endfor %}</ul>
         {{ form.orgs.errors }}
       </div>
+      {% if can_reset_mfa %}
+      <form method="post" action="{% url 'console-person-mfa-reset' person.pk %}" class="card">
+        {% csrf_token %}
+        <h2>Two-factor sign-in</h2>
+        <p class="muted">Clears {{ person.username }}&rsquo;s authenticator and recovery codes. They set it up again at their next sign-in. Their password is not changed.</p>
+        <button class="btn" type="submit">Reset two-factor sign-in</button>
+      </form>
+      {% endif %}
     </div>
   </div>
   <div class="actions"><a class="btn" href="{% url 'console-people' %}">Cancel</a><button class="btn primary" type="submit">Save</button></div>

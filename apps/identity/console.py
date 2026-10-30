@@ -111,7 +111,10 @@ def person_edit(request, pk=None):
         messages.success(request, f"Saved {saved.username}.")
         return redirect("console-people")
     return render(request, "console/person_form.html", {
-        "form": form, "person": person, "editing_self": editing_self})
+        "form": form, "person": person, "editing_self": editing_self,
+        "can_reset_mfa": (person is not None and not editing_self
+                          and request.user.has_perm("identity.change_user")
+                          and _may_edit(request, person))})
 
 
 # -- Apps --------------------------------------------------------------------

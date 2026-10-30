@@ -1,0 +1,347 @@
+"""The sign-in step: a password alone gets you nowhere, a code finishes it.
+
+Codes are made with ``apps.mfa.totp.generate_totp`` — no time freezing: a code
+generated now verifies now. The sign-in POSTs to ``/login/`` go through the
+real view chain, so the second factor cannot be short-circuited by whatever
+the app happens to be rendering at the URL it started from.
+"""
+
+from io import StringIO
+from unittest import mock
+
+from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.core.management.base import CommandError
+from django.test import TestCase
+from django.urls import reverse
+from django.utils.timezone import now
+
+from apps.mfa import views
+from apps.mfa.models import MfaProfile, RecoveryCode, TotpAttempt
+from apps.mfa.recovery import RECOVERY_CODE_COUNT, make_codes
+from apps.mfa.totp import generate_totp
+
+STRONG = "correct-horse-battery-9"
+SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
+
+
+def enroll(user, secret=SECRET):
+    """Install a confirmed authenticator without going through the QR page."""
+    profile, _ = MfaProfile.objects.get_or_create(user=user)
+    profile.totp_secret = secret
+    profile.totp_confirmed_at = now()
+    profile.save()
+    return secret
+
+
+class SignInStepTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("alice", password=STRONG)
+
+    def password_step(self, next_url=None):
+        """The first step, and only the first step."""
+        data = {"username": "alice", "password": STRONG}
+        if next_url:
+            data["next"] = next_url
+        return self.client.post(reverse("login"), data)
+
+    def second_step(self, code):
+        return self.client.post(reverse("mfa:verify"), {"code": code})
+
+    def signed_in(self):
+        return "_auth_user_id" in self.client.session._session
+
+    def test_password_alone_does_not_sign_in(self):
+        enroll(self.user)
+        resp = self.password_step()
+        self.assertRedirects(resp, reverse("mfa:verify"), fetch_redirect_response=False)
+        self.assertFalse(self.signed_in())
+
+        home = self.client.get("/")
+        self.assertEqual(home.status_code, 302)
+        self.assertIn("/login/", home["Location"])
+        people = self.client.get(reverse("console-people"))
+        self.assertIn(people.status_code, (302, 403))
+
+    def test_first_sign_in_enrols_then_shows_codes_then_signs_in(self):
+        resp = self.password_step()
+        # No factor yet: the second step leads to the QR and the key to type in.
+        page = self.client.get(resp["Location"])
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Scan this with your authenticator app")
+        self.assertFalse(self.signed_in())
+        secret = self.client.session[views.ENROL_KEY]
+
+        resp = self.client.post(reverse("mfa:setup"), {"code": generate_totp(secret)})
+        # Enrolment is confirmed by the same code that finishes the sign-in —
+        # recovery codes are handed out *after* it, so they cannot open a door.
+        self.assertRedirects(resp, reverse("mfa:codes"))
+        self.assertTrue(self.signed_in())
+        shown = self.client.session[views.FRESH_CODES_KEY]
+        self.assertEqual(len(shown), RECOVERY_CODE_COUNT)
+        self.assertContains(self.client.get(reverse("mfa:codes")),
+                            "this is the only time they are shown")
+
+        # The codes page hands back the destination the password step was asked
+        # for, and the codes leave the session either way.
+        resp = self.client.post(reverse("mfa:codes"))
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp["Location"], "/")
+        self.assertNotIn(views.FRESH_CODES_KEY, self.client.session._session)
+
+        self.assertEqual(self.client.get("/").status_code, 200)
+        self.assertEqual(RecoveryCode.objects.filter(user=self.user,
+                                                     used_at__isnull=True).count(),
+                         RECOVERY_CODE_COUNT)
+
+    def test_wrong_code_keeps_you_out_and_six_wrong_codes_lock_for_now(self):
+        enroll(self.user)
+        self.password_step()
+        # Five wrong codes are answered as wrong; the sixth is refused before
+        # its code is even looked at, so a live code no longer gets you in.
+        for _ in range(5):
+            resp = self.second_step("000000")
+            self.assertEqual(resp.status_code, 400)
+            self.assertFalse(self.signed_in())
+
+        resp = self.second_step(generate_totp(SECRET))
+        self.assertEqual(resp.status_code, 400)
+        self.assertContains(resp, "Too many wrong codes", status_code=400)
+        self.assertFalse(self.signed_in())
+
+    def test_code_cannot_be_replayed(self):
+        enroll(self.user)
+        code = generate_totp(SECRET)
+        self.password_step()
+        resp = self.second_step(code)
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(self.signed_in())
+
+        self.client.post(reverse("logout"))
+        self.password_step()
+        resp = self.second_step(code)
+        self.assertEqual(resp.status_code, 400)
+        self.assertContains(resp, "already used", status_code=400)
+        self.assertFalse(self.signed_in())
+
+    def test_recovery_code_signs_in_once(self):
+        enroll(self.user)
+        plain = make_codes(self.user)[0]
+        self.password_step()
+        resp = self.second_step(plain.upper().replace("-", ""))
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp["Location"], "/")
+
+        # Same code a second time — the dash and capitals were typed differently,
+        # but it was the same code and it is spent.
+        self.client.post(reverse("logout"))
+        self.password_step()
+        resp = self.second_step(plain)
+        self.assertEqual(resp.status_code, 400)
+        self.assertFalse(self.signed_in())
+        self.assertEqual(RecoveryCode.objects.filter(user=self.user,
+                                                     used_at__isnull=False).count(), 1)
+
+    def test_pending_sign_in_expires(self):
+        enroll(self.user)
+        with mock.patch("time.time", return_value=1_700_000_000.0):
+            self.password_step()
+        with mock.patch("time.time", return_value=1_700_000_000.0 + 301):
+            resp = self.second_step(generate_totp(SECRET))
+        self.assertRedirects(resp, reverse("login"))
+        self.assertFalse(self.signed_in())
+
+    def test_next_is_kept_but_only_on_this_host(self):
+        enroll(self.user)
+        self.password_step(next_url="https://evil.example/")
+        resp = self.second_step(generate_totp(SECRET))
+        self.assertEqual(resp["Location"], "/")
+
+    def test_next_lands_on_the_page_it_named_when_it_is_relative(self):
+        enroll(self.user)
+        self.password_step(next_url="/console/people/")
+        resp = self.second_step(generate_totp(SECRET))
+        self.assertEqual(resp["Location"], "/console/people/")
+
+    def test_admin_login_goes_through_the_two_step_sign_in(self):
+        get_user_model().objects.filter(pk=self.user.pk).update(is_staff=True)
+        resp = self.client.get("/admin/login/", {"next": "/admin/auth/user/"})
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("/login/", resp["Location"])
+        self.assertIn("next", resp["Location"])
+
+    def test_signed_in_staff_still_reach_the_admin(self):
+        get_user_model().objects.filter(pk=self.user.pk).update(is_staff=True,
+                                                                is_superuser=True)
+        self.client.force_login(self.user)
+        self.assertEqual(self.client.get("/admin/login/").status_code, 200)
+
+    def test_sso_authorize_needs_the_second_step(self):
+        from apps.identity.models import RegisteredApp
+
+        RegisteredApp.objects.create(slug="vigil", name="Vigil",
+                                     redirect_base="https://vigil.example.com/cb")
+        enroll(self.user)
+        self.password_step()
+        resp = self.client.get("/sso/authorize", {
+            "app": "vigil", "redirect_uri": "https://vigil.example.com/cb"})
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("/login/", resp["Location"])
+
+
+class EncryptedAtRestTests(TestCase):
+    def test_secret_is_encrypted_at_rest(self):
+        from django.db import connection
+
+        user = get_user_model().objects.create_user("bob", password=STRONG)
+        enroll(user)
+        column = MfaProfile._meta.get_field("totp_secret_encrypted").column
+        with connection.cursor() as cur:
+            cur.execute(f"select {column} from mfa_mfaprofile")
+            raw = bytes(cur.fetchone()[0])
+        self.assertNotIn(SECRET.encode(), raw)
+        self.assertEqual(MfaProfile.objects.get(user=user).totp_secret, SECRET)
+
+
+class SecurityPageTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("carol", password=STRONG)
+        enroll(self.user)
+        make_codes(self.user)
+        self.client.force_login(self.user)
+
+    def act(self, action, code):
+        return self.client.post(reverse("mfa:security"), {"action": action, "code": code})
+
+    def test_new_recovery_codes_need_a_current_code(self):
+        before = RecoveryCode.objects.filter(user=self.user).count()
+        resp = self.act("codes", "000000")
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotIn(views.FRESH_CODES_KEY, self.client.session._session)
+        self.assertEqual(RecoveryCode.objects.filter(user=self.user).count(), before)
+
+    def test_a_recovery_code_also_confirms_a_new_set(self):
+        resp = self.act("codes", make_codes(self.user)[0])
+        self.assertRedirects(resp, reverse("mfa:codes"))
+
+    def test_a_fresh_set_replaces_the_old_one(self):
+        resp = self.act("codes", generate_totp(SECRET))
+        self.assertRedirects(resp, reverse("mfa:codes"))
+        self.assertEqual(len(self.client.session[views.FRESH_CODES_KEY]), RECOVERY_CODE_COUNT)
+        # The codes the user held are replaced, not added to.
+        self.assertEqual(RecoveryCode.objects.filter(user=self.user).count(),
+                         RECOVERY_CODE_COUNT)
+
+    def test_there_is_no_self_service_reset(self):
+        """Someone holding only a session must not be able to clear the
+        factors and enrol their own: resets are a staff action."""
+        resp = self.client.post(reverse("mfa:security"), {"action": "reset"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(MfaProfile.objects.get(user=self.user).totp_secret, SECRET)
+        self.assertTrue(get_user_model().objects.get(pk=self.user.pk).is_active)
+
+    def test_new_authenticator_keeps_the_old_until_confirmed(self):
+        resp = self.act("setup", "000000")
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotIn(views.ENROL_KEY, self.client.session._session)
+        self.assertEqual(MfaProfile.objects.get(user=self.user).totp_secret, SECRET)
+
+        resp = self.act("setup", generate_totp(SECRET))
+        self.assertRedirects(resp, reverse("mfa:setup"))
+        new_secret = self.client.session[views.ENROL_KEY]
+        self.assertNotEqual(new_secret, SECRET)
+
+        # A wrong code on the setup page leaves the old authenticator working.
+        resp = self.client.post(reverse("mfa:setup"), {"code": "000000"})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(MfaProfile.objects.get(user=self.user).totp_secret, SECRET)
+
+        resp = self.client.post(reverse("mfa:setup"), {"code": generate_totp(new_secret)})
+        self.assertRedirects(resp, reverse("mfa:codes"))
+        self.assertEqual(MfaProfile.objects.get(user=self.user).totp_secret, new_secret)
+
+
+class StaffResetTests(TestCase):
+    def setUp(self):
+        from django.contrib.auth.models import Permission
+
+        self.admin = get_user_model().objects.create_superuser("admin", password=STRONG)
+        enroll(self.admin)
+        self.person = get_user_model().objects.create_user("tom", password=STRONG)
+        enroll(self.person)
+        make_codes(self.person)
+        TotpAttempt.objects.create(user=self.person)
+        self.helper = get_user_model().objects.create_user("helper", password=STRONG,
+                                                           is_staff=True)
+        self.helper.user_permissions.add(Permission.objects.get(codename="change_user"))
+
+    def test_staff_reset_clears_factors_and_is_logged(self):
+        from django.contrib.admin.models import LogEntry
+
+        self.client.force_login(self.helper)
+        resp = self.client.post(reverse("console-person-mfa-reset", args=[self.person.pk]))
+        self.assertRedirects(resp, reverse("console-person", args=[self.person.pk]))
+        self.assertFalse(MfaProfile.objects.filter(user=self.person).exists())
+        self.assertFalse(RecoveryCode.objects.filter(user=self.person).exists())
+        self.assertFalse(TotpAttempt.objects.filter(user=self.person).exists())
+        entry = LogEntry.objects.get(object_id=str(self.person.pk))
+        self.assertIn("Two-factor sign-in reset in the console.", entry.change_message)
+
+    def test_cannot_reset_yourself(self):
+        self.client.force_login(self.admin)
+        resp = self.client.post(reverse("console-person-mfa-reset", args=[self.admin.pk]))
+        self.assertEqual(resp.status_code, 403)
+        self.assertTrue(MfaProfile.objects.filter(user=self.admin).exists())
+
+    def test_non_superuser_cannot_reset_a_superuser(self):
+        boss = get_user_model().objects.create_superuser("boss", password=STRONG)
+        enroll(boss)
+        self.client.force_login(self.helper)
+        resp = self.client.post(reverse("console-person-mfa-reset", args=[boss.pk]))
+        self.assertEqual(resp.status_code, 403)
+        self.assertTrue(MfaProfile.objects.filter(user=boss).exists())
+
+    def test_the_button_only_appears_for_someone_you_may_edit(self):
+        self.client.force_login(self.helper)
+        page = self.client.get(reverse("console-person", args=[self.person.pk]))
+        self.assertContains(page, "Reset two-factor sign-in")
+        own = self.client.get(reverse("console-person", args=[self.helper.pk]))
+        self.assertNotContains(own, "mfa-reset")
+
+
+class SetSecretCommandTests(TestCase):
+    def test_set_secret_command_refuses_without_debug(self):
+        get_user_model().objects.create_user("dave", password=STRONG)
+        with self.settings(DEBUG=False), self.assertRaises(CommandError):
+            call_command("mfa_set_secret", "dave", SECRET, stdout=StringIO())
+        self.assertFalse(MfaProfile.objects.exists())
+
+        with self.settings(DEBUG=True):
+            call_command("mfa_set_secret", "dave", SECRET, stdout=StringIO())
+        self.assertTrue(MfaProfile.objects.get(user__username="dave").confirmed())
+
+
+class RecoveryCodeTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("erin", password=STRONG)
+
+    def test_codes_are_ten_shown_as_five_dash_five_and_work_once(self):
+        from apps.mfa.recovery import remaining, use_code
+
+        codes = make_codes(self.user)
+        self.assertEqual(len(codes), RECOVERY_CODE_COUNT)
+        self.assertTrue(all(len(c) == 11 and c[5] == "-" for c in codes))
+        self.assertEqual(remaining(self.user), RECOVERY_CODE_COUNT)
+
+        self.assertTrue(use_code(self.user, codes[0].upper()))
+        self.assertEqual(remaining(self.user), RECOVERY_CODE_COUNT - 1)
+        self.assertFalse(use_code(self.user, codes[0]))
+
+    def test_a_new_set_replaces_the_old_ones(self):
+        from apps.mfa.recovery import use_code
+
+        first = make_codes(self.user)[0]
+        second = make_codes(self.user)[0]
+        self.assertNotEqual(first, second)
+        self.assertFalse(use_code(self.user, first))
+        self.assertTrue(use_code(self.user, second))

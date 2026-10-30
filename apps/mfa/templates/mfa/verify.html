@@ -1,0 +1,20 @@
+{% extends "console/base.html" %}
+{% block title %}Verify it's you{% endblock %}
+{% block auth %}
+<div class="card">
+  <h1>Verify it&rsquo;s you</h1>
+  <p class="muted">Signing in as <strong>{{ username }}</strong>.</p>
+  {% if error %}<ul class="errorlist"><li>{{ error }}</li></ul>{% endif %}
+  <form method="post">
+    {% csrf_token %}
+    <div class="field">
+      <label for="id_code">Code</label>
+      <input type="text" name="code" id="id_code" inputmode="numeric" maxlength="7"
+             placeholder="123456" autocomplete="one-time-code" autofocus required>
+      <div class="help">Enter the six-digit code from your authenticator app, or a recovery code.</div>
+    </div>
+    <button class="btn primary" type="submit">Verify and sign in</button>
+  </form>
+  <p class="muted" style="margin-top:1rem"><a href="{% url 'login' %}">Start over</a></p>
+</div>
+{% endblock %}
