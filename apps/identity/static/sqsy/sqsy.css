@@ -374,3 +374,7 @@ input[type=search]:hover, input[type=password]:hover, input[type=url]:hover, tex
 /* Names the page templates use, mapped onto the tokens above. */
 :root { --card: var(--s1); --raised: var(--s2); --line: var(--border); --text: var(--text-1);
         --muted: var(--text-2); --green: var(--mint-ink); }
+/* A product logo image in place of the brand letter. */
+.sidebar-logo-img { background: none; overflow: hidden; padding: 0; }
+.sidebar-logo-img img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit; }
+.auth img.mark-img { display: block; object-fit: cover; padding: 0; }

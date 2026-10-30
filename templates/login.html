@@ -1,8 +1,9 @@
 {% extends "console/base.html" %}
+{% load static %}
 {% block title %}Sign in{% endblock %}
 {% block auth %}
 <div class="card">
-  <div class="mark">C</div>
+  <img class="mark mark-img" src="{% static 'sqsy/civil.png' %}" alt="Civil">
   <h1>Civil</h1>
   <p class="muted">One account for every SQSY app.</p>
   <form method="post">
