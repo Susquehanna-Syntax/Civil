@@ -27,6 +27,7 @@ alone, so no header can enrol a key for a domain nobody configured.
 from __future__ import annotations
 
 import hashlib
+from datetime import timedelta
 import json
 import secrets
 import time
@@ -322,28 +323,38 @@ def authenticate(request, credential, user=None) -> str:
     key.last_used_at = now()
     key.save(update_fields=["sign_count", "last_used_at"])
 
+    from .models import KeyToken
+
     token = KEY_TOKEN_PREFIX + secrets.token_urlsafe(32)
-    # Kept in this browser's session (not a per-process cache), so it works
-    # with several server workers and is useless from any other browser.
-    tokens = {
-        digest: entry
-        for digest, entry in (request.session.get(TOKEN_SESSION_KEY) or {}).items()
-        if entry[1] > time.time()
-    }
-    tokens[_token_digest(token)] = [str(user.pk), time.time() + KEY_TOKEN_SECONDS]
-    request.session[TOKEN_SESSION_KEY] = tokens
+    # A database row (shared by every server worker), bound to this user and
+    # this browser's session, spent by an atomic delete.
+    KeyToken.objects.filter(expires_at__lt=now()).delete()
+    KeyToken.objects.create(
+        digest=_token_digest(token),
+        user=user,
+        session_key=_session_key(request),
+        expires_at=now() + timedelta(seconds=KEY_TOKEN_SECONDS),
+    )
     return token
 
 
+def _session_key(request) -> str:
+    session = request.session
+    if not getattr(session, "session_key", None) and hasattr(session, "save"):
+        session.save()
+    return getattr(session, "session_key", "") or ""
+
+
 def consume_key_token(request, user, token: str) -> bool:
-    """True once: the token is removed from the session as it is checked."""
+    """True exactly once, for the user and browser session it was issued to."""
+    from .models import KeyToken
+
     if not isinstance(token, str) or not token.startswith(KEY_TOKEN_PREFIX):
         return False
-    tokens = dict(request.session.get(TOKEN_SESSION_KEY) or {})
-    digest = _token_digest(token)
-    entry = tokens.get(digest)
-    if not entry or entry[0] != str(user.pk):
-        return False
-    tokens.pop(digest)
-    request.session[TOKEN_SESSION_KEY] = tokens
-    return entry[1] > time.time()
+    deleted, _ = KeyToken.objects.filter(
+        digest=_token_digest(token),
+        user=user,
+        session_key=_session_key(request),
+        expires_at__gt=now(),
+    ).delete()
+    return deleted == 1

@@ -28,7 +28,7 @@
   {% if user.is_authenticated %}
   <p class="muted" style="margin-top:1rem"><a href="{% url 'mfa:security' %}">Cancel</a></p>
   {% else %}
-  <p class="muted" style="margin-top:1rem"><a href="{% url 'login' %}">Start over</a></p>
+  <p class="muted" style="margin-top:1rem"><a href="{{ login_url }}">Start over</a></p>
   {% endif %}
 </div>
 {% endblock %}

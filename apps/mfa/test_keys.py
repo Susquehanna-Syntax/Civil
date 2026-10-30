@@ -538,33 +538,45 @@ class KeyTokenTests(KeyTestCase):
         self.user = get_user_model().objects.create_user("wa-erin", password=STRONG)
 
     def test_key_token_is_single_use_and_expires(self):
-        import time as _time
+        from datetime import timedelta
         from types import SimpleNamespace
+
+        from django.utils.timezone import now
+
+        from .models import KeyToken
 
         token = keys.KEY_TOKEN_PREFIX + "a" * 43
         digest = keys._token_digest(token)
-        # Stored hashed: a dump of the session must not hand over a live factor.
+        # Stored hashed: a dump of the table must not hand over a live factor.
         self.assertNotIn(keys.KEY_TOKEN_PREFIX, digest)
-        request = SimpleNamespace(session={})
+        mine = SimpleNamespace(session=SimpleNamespace(session_key="browser-1"))
+        theirs = SimpleNamespace(session=SimpleNamespace(session_key="browser-2"))
 
-        self.assertFalse(keys.consume_key_token(request, self.user, token))
-        self.assertFalse(keys.consume_key_token(request, self.user, "totp123"))
-        self.assertFalse(keys.consume_key_token(request, self.user, None))
+        self.assertFalse(keys.consume_key_token(mine, self.user, token))
+        self.assertFalse(keys.consume_key_token(mine, self.user, "totp123"))
+        self.assertFalse(keys.consume_key_token(mine, self.user, None))
 
-        live = [str(self.user.pk), _time.time() + keys.KEY_TOKEN_SECONDS]
-        request.session[keys.TOKEN_SESSION_KEY] = {digest: live}
-        self.assertTrue(keys.consume_key_token(request, self.user, token))
-        # Spent: the second use has nothing left.
-        self.assertFalse(keys.consume_key_token(request, self.user, token))
+        def issue(expires_in=60):
+            KeyToken.objects.update_or_create(
+                digest=digest,
+                defaults={"user": self.user, "session_key": "browser-1",
+                          "expires_at": now() + timedelta(seconds=expires_in)},
+            )
 
-        request.session[keys.TOKEN_SESSION_KEY] = {digest: live}
+        issue()
+        self.assertTrue(keys.consume_key_token(mine, self.user, token))
+        # Spent: the second use has nothing left to delete.
+        self.assertFalse(keys.consume_key_token(mine, self.user, token))
+
+        issue()
         other = get_user_model().objects.create_user("wa-zed", password=STRONG)
-        self.assertFalse(keys.consume_key_token(request, other, token))
-        # A wrong owner may not spend it either — its real owner still can.
-        self.assertTrue(keys.consume_key_token(request, self.user, token))
+        self.assertFalse(keys.consume_key_token(mine, other, token))
+        # Another browser holding the token cannot spend it either.
+        self.assertFalse(keys.consume_key_token(theirs, self.user, token))
+        self.assertTrue(keys.consume_key_token(mine, self.user, token))
 
-        request.session[keys.TOKEN_SESSION_KEY] = {digest: [str(self.user.pk), _time.time() - 1]}
-        self.assertFalse(keys.consume_key_token(request, self.user, token))
+        issue(expires_in=-1)
+        self.assertFalse(keys.consume_key_token(mine, self.user, token))
 
     def test_a_key_token_confirms_a_security_page_action(self):
         enroll(self.user)

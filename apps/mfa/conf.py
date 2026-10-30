@@ -29,8 +29,20 @@ def rp_name() -> str:
     return getattr(settings, "MFA_RP_NAME", "") or issuer()
 
 
+def login_url() -> str:
+    """The password sign-in page: the host app's own ``LOGIN_URL``."""
+    from django.shortcuts import resolve_url
+
+    return resolve_url(settings.LOGIN_URL)
+
+
+def login_template() -> str:
+    """The template the password step renders (the host app's sign-in page)."""
+    return getattr(settings, "MFA_LOGIN_TEMPLATE", "login.html")
+
+
 def required_fn():
-    path = getattr(settings, "MFA_REQUIRED", "apps.mfa.policy.everyone")
+    path = getattr(settings, "MFA_REQUIRED", f"{__package__}.policy.everyone")
     if callable(path):
         return path
     return _dotted(path)

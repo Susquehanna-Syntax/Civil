@@ -11,6 +11,8 @@ from urllib.parse import urlencode
 from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import redirect
 
+from . import conf
+
 
 def admin_login_redirect(request):
     """Anonymous or plain-password sessions start at ``/login/`` with the
@@ -18,7 +20,7 @@ def admin_login_redirect(request):
     if request.user.is_authenticated and request.user.is_active and request.user.is_staff:
         return _admin_index(request)
     target = request.GET.get("next") or "/admin/"
-    return redirect(f"/login/?{urlencode({'next': target})}")
+    return redirect(f"{conf.login_url()}?{urlencode({'next': target})}")
 
 
 @staff_member_required

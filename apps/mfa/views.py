@@ -212,7 +212,7 @@ def verify(request):
     a pending user in once that code checks out."""
     user, state = _pending(request)
     if user is None:
-        return redirect("login")
+        return redirect(conf.login_url())
 
     if not has_second_factor(user):
         return setup(request)
@@ -236,6 +236,7 @@ def verify(request):
             "error": error,
             "username": user.get_username(),
             "keys": _keys_offered(request, user),
+            "login_url": conf.login_url(),
         },
         status=400 if error else 200,
     )
@@ -261,7 +262,8 @@ def codes(request):
 class MfaLoginView(auth_views.LoginView):
     """The password step. A correct password only *starts* a sign-in."""
 
-    template_name = "login.html"
+    def get_template_names(self):
+        return [conf.login_template()]
 
     def form_valid(self, form):
         user = form.get_user()
@@ -420,7 +422,7 @@ def setup(request):
     else:
         user, state = _pending(request)
         if user is None:
-            return redirect("login")
+            return redirect(conf.login_url())
         # A password alone may enrol only an account that has no factor at
         # all; one that has a factor must use it.
         if has_second_factor(user):
@@ -453,6 +455,7 @@ def setup(request):
         {
             "error": error,
             "totp_secret": secret,
+            "login_url": conf.login_url(),
             "totp_qr_svg": totp_qr_svg(otpauth_uri(secret, user.get_username())),
         },
         status=400 if error else 200,

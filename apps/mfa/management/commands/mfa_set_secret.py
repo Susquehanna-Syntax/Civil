@@ -10,7 +10,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.utils.timezone import now
 
-from apps.mfa.models import MfaProfile
+from ...models import MfaProfile
 
 
 class Command(BaseCommand):

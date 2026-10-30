@@ -118,3 +118,14 @@ class SecurityKey(models.Model):
 
     def __str__(self) -> str:
         return f"key {self.name!r} <user {self.user_id}>"
+
+
+class KeyToken(models.Model):
+    """A one-time confirmation from a security-key tap. Spent by deleting the
+    row: the database says exactly once that it removed it, so two requests
+    racing on one token cannot both pass a gate with it."""
+
+    digest = models.CharField(max_length=64, unique=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    session_key = models.CharField(max_length=64, blank=True, default="")
+    expires_at = models.DateTimeField()

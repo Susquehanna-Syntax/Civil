@@ -30,7 +30,7 @@
     </div>
     <button class="btn primary" type="submit">Verify and sign in</button>
   </form>
-  <p class="muted" style="margin-top:1rem"><a href="{% url 'login' %}">Start over</a></p>
+  <p class="muted" style="margin-top:1rem"><a href="{{ login_url }}">Start over</a></p>
 </div>
 {% endblock %}
 {% block script %}
