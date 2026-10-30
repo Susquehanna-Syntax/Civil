@@ -18,19 +18,28 @@ Guesses count against the same per-user code limit the security page uses,
 so the second step cannot be brute-forced from the sign-in page either.
 """
 
+import json
 import time
 
 from django.contrib import auth, messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_POST
+from webauthn.helpers.exceptions import (
+    InvalidAuthenticationResponse,
+    InvalidRegistrationResponse,
+)
 
-from . import conf, recovery
+from . import conf, keys, recovery
 from .models import MfaProfile
 from .qr import totp_qr_svg
 from .totp import (
+    _clear_totp_attempts,
+    _totp_attempt_allowed,
     confirm_secret,
     consume_totp,
     generate_secret,
@@ -45,9 +54,29 @@ AFTER_CODES_KEY = "mfa:after_codes"
 #: Whose fresh recovery codes and enrolment secret these are. Both are only
 #: ever honoured for that same signed-in user.
 OWNER_KEY = "mfa:owner"
+#: Set when a signed-in user confirms with their current factor and is handed
+#: WebAuthn creation options; only the registration from that same user uses it.
+KEY_GATE_KEY = "mfa:key_gate"
 #: Long enough to find a phone; short enough that a password typed on a shared
 #: machine and walked away from does not stay half signed in.
 PENDING_SECONDS = 300
+
+TOO_MANY = "Too many wrong codes. Wait a few minutes and try again."
+KEY_FAILED = "That key was not accepted. Try again or use a code."
+
+
+def _json_error(message: str, status: int = 400) -> JsonResponse:
+    return JsonResponse({"error": message}, status=status)
+
+
+def _body(request) -> dict:
+    """The JSON body, or ``{}`` when there wasn't one. A credential the browser
+    never sent is an ordinary wrong answer, not a server error."""
+    try:
+        data = json.loads(request.body or b"{}")
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def safe_next(request, candidate: str) -> str:
@@ -61,7 +90,7 @@ def safe_next(request, candidate: str) -> str:
 
 def begin(request, user, next_url: str = "/", backend: str = ""):
     """Park ``user`` as pending and send the browser to the second step."""
-    for key in (ENROL_KEY, FRESH_CODES_KEY, AFTER_CODES_KEY, OWNER_KEY):
+    for key in (ENROL_KEY, FRESH_CODES_KEY, AFTER_CODES_KEY, OWNER_KEY, KEY_GATE_KEY):
         request.session.pop(key, None)
     request.session[PENDING_KEY] = {
         "uid": str(user.pk),
@@ -108,6 +137,75 @@ def _finish(request, user, state) -> str:
     return state.get("next") or "/"
 
 
+def _keys_offered(request, user) -> bool:
+    """Whether to offer a key tap here: keys configured for this install, and
+    this account has at least one."""
+    _rp_id, origin = keys.relying_party(request)
+    return keys.secure_context(origin) and keys.user_has_keys(user)
+
+
+def _confirming(request) -> bool:
+    """Whether this key request is a signed-in person confirming an action on
+    the security page rather than a pending sign-in finishing itself.
+
+    Django's ``login_required`` answers an anonymous *POST* with a redirect to
+    the sign-in page, which a fetch call cannot do anything with — so the same
+    endpoint serves both cases and says so in JSON when there is nobody here.
+    """
+    return request.GET.get("confirm") == "1"
+
+
+@require_POST
+def verify_key_options(request):
+    """Assertion options: for the pending sign-in, or, with ``?confirm=1``, for
+    the signed-in user confirming something. 404 without either — nothing is
+    offered before a password has been accepted."""
+    user = request.user if _confirming(request) else _pending(request)[0]
+    if user is None or not user.is_authenticated:
+        return _json_error("Your sign-in expired. Start again.", 404)
+    try:
+        return JsonResponse(keys.authentication_options(request, user=user))
+    except ValueError as exc:
+        return _json_error(str(exc))
+
+
+@require_POST
+def verify_key(request):
+    """Verify the tap and finish the sign-in in the same request.
+
+    ``?confirm=1`` is the other use of the same ceremony: a signed-in person
+    confirming an action on the security page, for whom there is no pending
+    sign-in to finish — that request answers with the one-time token, which
+    the page sends back as the ``code`` field. Either way a guess against this
+    account is recorded in the counter a typed code uses, so the two together
+    still get five tries.
+    """
+    confirming = _confirming(request)
+    user, state = (request.user, None) if confirming else _pending(request)
+    if user is None or not user.is_authenticated:
+        return _json_error("Your sign-in expired. Start again.", 404)
+    if not keys.user_has_keys(user):
+        return _json_error("No security key is set up for this account.")
+    if not _totp_attempt_allowed(user):
+        return _json_error(TOO_MANY, 429)
+    try:
+        token = keys.authenticate(
+            request,
+            _body(request).get("credential"),
+            user=user,
+        )
+    except (TypeError, ValueError, InvalidAuthenticationResponse) as exc:
+        return _json_error(str(exc) or KEY_FAILED)
+    _clear_totp_attempts(user)
+    if confirming:
+        # Nothing to sign in: the token is what stands in for a code, and it is
+        # spent by whichever action the page goes on to confirm.
+        return JsonResponse({"token": token})
+    if not keys.consume_key_token(request, user, token):
+        return _json_error(KEY_FAILED)
+    return JsonResponse({"next": _finish(request, user, state)})
+
+
 def verify(request):
     """The second step. Enrolment for a factor-less account happens on the
     setup page, which confirms a code before it replaces anything — and signs
@@ -121,15 +219,24 @@ def verify(request):
 
     error = None
     if request.method == "POST":
-        ok, err = consume_totp(user, request.POST.get("code", ""))
-        if ok:
-            return redirect(_finish(request, user, state))
-        error = err
+        code = request.POST.get("code", "")
+        if code.strip().startswith(keys.KEY_TOKEN_PREFIX):
+            # A key token is handed over by the key button below, never typed.
+            error = "Enter the six-digit code from your authenticator app."
+        else:
+            ok, err = consume_totp(user, code, request)
+            if ok:
+                return redirect(_finish(request, user, state))
+            error = err
 
     return render(
         request,
         "mfa/verify.html",
-        {"error": error, "username": user.get_username()},
+        {
+            "error": error,
+            "username": user.get_username(),
+            "keys": _keys_offered(request, user),
+        },
         status=400 if error else 200,
     )
 
@@ -173,9 +280,10 @@ class MfaLoginView(auth_views.LoginView):
 # -- The signed-in security page ---------------------------------------------
 
 
-def _confirmed_for_post(request, user) -> bool:
-    """Every action that changes a factor needs a code from the current one."""
-    ok, err = consume_totp(user, request.POST.get("code", ""))
+def _confirmed(request, raw) -> bool:
+    """Whether ``raw`` — a typed code or the ``wa_`` token a key tap handed
+    back — is a factor this account holds right now."""
+    ok, err = consume_totp(request.user, raw or "", request)
     if not ok:
         messages.error(request, err or "That code didn't match.")
     return ok
@@ -189,25 +297,110 @@ def security(request):
     if request.method == "POST" and has_authenticator:
         action = request.POST.get("action", "")
         if action == "codes":
-            if _confirmed_for_post(request, user):
+            if _confirmed(request, request.POST.get("code")):
                 request.session[FRESH_CODES_KEY] = recovery.make_codes(user)
                 request.session[OWNER_KEY] = str(user.pk)
                 return redirect("mfa:codes")
-        elif action == "setup" and _confirmed_for_post(request, user):
+        elif action == "setup" and _confirmed(request, request.POST.get("code")):
             # The old secret stays until the new one checks out on setup, and
             # this secret is only good for this signed-in user.
             request.session[ENROL_KEY] = generate_secret()
             request.session[OWNER_KEY] = str(user.pk)
             return redirect("mfa:setup")
 
+    _rp_id, origin = keys.relying_party(request)
     return render(
         request,
         "mfa/security_page.html",
         {
             "has_authenticator": has_authenticator,
             "recovery_remaining": recovery.remaining(user),
+            "security_keys": user.security_keys.all(),
+            "keys_available": keys.secure_context(origin),
+            "keys_reason": keys.unavailable_reason(origin),
         },
     )
+
+
+# -- Security keys on the security page ---------------------------------------
+
+
+@login_required
+@require_POST
+def key_options(request):
+    """Creation options — and the confirmation that entitles them.
+
+    Adding a factor costs the factor you already have, so that a stolen session
+    cannot enrol the attacker's key and pass every gate after it: the code (or
+    the ``wa_`` token from a key tap) is checked here, once, and the finished
+    ceremony has nothing else to prove. Keeping the confirmation in the session
+    rather than in the browser is deliberate — what a page echoes back is worth
+    nothing, whereas this cannot be forged or replayed by anyone but the user
+    who spent their factor on it.
+
+    The challenge lives in the session and is used once, so the registration
+    must follow this call rather than precede it.
+    """
+    _rp_id, origin = keys.relying_party(request)
+    reason = keys.unavailable_reason(origin)
+    if reason:
+        return _json_error(reason)
+    # Say why keys are off before spending anyone's code on the question.
+    if not _confirmed(request, _body(request).get("code")):
+        request.session.pop(KEY_GATE_KEY, None)
+        return _json_error("Confirm with your current code or key first.", 401)
+    try:
+        options = keys.registration_options(request)
+    except ValueError as exc:
+        return _json_error(str(exc))
+    request.session[KEY_GATE_KEY] = str(request.user.pk)
+    return JsonResponse(options)
+
+
+@require_POST
+@login_required
+def key_register(request):
+    """Verify the registration response and save the key, for a user who was
+    handed options a moment ago — after confirming with their current factor.
+
+    ``consume_totp`` spends the failed-guess counter as a side effect, so by
+    the time somebody has burned it out this is a 401 rather than a 429: still
+    refused, and nothing here counts against the limit again.
+    """
+    if request.session.pop(KEY_GATE_KEY, None) != str(request.user.pk):
+        return _json_error("Ask for the key request again first.", 401)
+    body = _body(request)
+    try:
+        key = keys.register(request, body.get("name"), body.get("credential"))
+    except (TypeError, ValueError, InvalidRegistrationResponse) as exc:
+        return _json_error(str(exc) or KEY_FAILED)
+    return JsonResponse({"id": key.id, "name": key.name}, status=201)
+
+
+@login_required
+@require_POST
+def key_delete(request, key_id: int):
+    """Remove one of your own keys; anybody else's is a 404.
+
+    Removing a factor costs a factor, and the last key can only go while an
+    authenticator is still there to catch the account — otherwise the person
+    would face their next sign-in with no factor left and no way back in.
+    """
+    key = request.user.security_keys.filter(pk=key_id).first()
+    if key is None:
+        return _json_error("No such security key.", 404)
+    if not _confirmed(request, _body(request).get("code")):
+        return _json_error("Confirm with your current code or key first.", 401)
+    remaining = request.user.security_keys.exclude(pk=key.pk).count()
+    profile = MfaProfile.objects.filter(user=request.user).first()
+    if remaining == 0 and not (profile is not None and profile.confirmed()):
+        return _json_error(
+            "Set up an authenticator app before removing your last key.", 400
+        )
+    key.delete()
+    return JsonResponse({"removed": key_id})
+
+
 def setup(request):
     """A new authenticator, confirmed with a code before the old secret is
     replaced. A signed-in user arrives from the security page; a pending

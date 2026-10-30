@@ -18,6 +18,17 @@ def issuer() -> str:
     return getattr(settings, "MFA_ISSUER", "Civil")
 
 
+def public_url() -> str:
+    """Where this install is opened from — the only origin a key may be bound
+    to. Empty means security keys are unavailable here (see ``keys``)."""
+    return getattr(settings, "MFA_PUBLIC_URL", "")
+
+
+def rp_name() -> str:
+    """The name an authenticator shows next to the account it belongs to."""
+    return getattr(settings, "MFA_RP_NAME", "") or issuer()
+
+
 def required_fn():
     path = getattr(settings, "MFA_REQUIRED", "apps.mfa.policy.everyone")
     if callable(path):

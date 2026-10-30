@@ -116,16 +116,25 @@ def _clear_totp_attempts(user) -> None:
     TotpAttempt.objects.filter(user=user).delete()
 
 
-def consume_totp(user, code: str) -> tuple[bool, str | None]:
+def consume_totp(user, code: str, request=None) -> tuple[bool, str | None]:
     """Verify a TOTP code for ``user`` and mark it consumed.
 
     Rejects codes that were used within the validity window so an
     intercepted code cannot be replayed for a second sensitive action.
-    Returns ``(ok, error_message)``.
+    A ``wa_…`` key token — handed back by a security-key tap, never typed —
+    is accepted here too, which is what lets every gate below be confirmed
+    with a key instead of a code. Returns ``(ok, error_message)``.
     """
+    from .keys import KEY_TOKEN_PREFIX, consume_key_token
     from .recovery import looks_like_recovery_code, use_code
 
     code = (code or "").strip().replace(" ", "")
+    if code.startswith(KEY_TOKEN_PREFIX):
+        # Key tokens live in the browser's session, so only a caller that
+        # passes the request can spend one.
+        if request is not None and consume_key_token(request, user, code):
+            return True, None
+        return False, "That key confirmation expired. Tap your key again."
     if looks_like_recovery_code(code):
         if use_code(user, code):
             return True, None
@@ -158,10 +167,10 @@ def consume_totp(user, code: str) -> tuple[bool, str | None]:
 
 
 def has_second_factor(user) -> bool:
-    """Whether this account can answer a second-factor prompt at all.
-
-    Phase 02 adds security keys here; until then it's a confirmed TOTP.
-    """
+    """Whether this account can answer a second-factor prompt at all: a
+    confirmed TOTP, or at least one security key."""
+    if user.security_keys.exists():
+        return True
     profile = getattr(user, "mfa", None)
     return bool(profile is not None and profile.confirmed())
 

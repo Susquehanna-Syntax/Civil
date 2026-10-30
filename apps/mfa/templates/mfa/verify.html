@@ -1,10 +1,25 @@
 {% extends "console/base.html" %}
+{% load static %}
 {% block title %}Verify it's you{% endblock %}
+{% block style %}
+  .key-offer { display: flex; align-items: center; gap: .75rem; margin-bottom: 1.1rem; }
+  .key-offer .btn { margin-right: auto; }
+  .key-or { color: var(--muted, #888); font-size: .85rem; }
+{% endblock %}
 {% block auth %}
 <div class="card">
   <h1>Verify it&rsquo;s you</h1>
   <p class="muted">Signing in as <strong>{{ username }}</strong>.</p>
   {% if error %}<ul class="errorlist"><li>{{ error }}</li></ul>{% endif %}
+  <div id="key-error" class="errorlist" hidden></div>
+  {% if keys %}
+  <div class="key-offer">
+    <button class="btn" type="button" id="mfa-key-signin"
+            data-options="{% url 'mfa:verify-key-options' %}"
+            data-verify="{% url 'mfa:verify-key' %}">Use a security key</button>
+    <span class="key-or">or use a code</span>
+  </div>
+  {% endif %}
   <form method="post">
     {% csrf_token %}
     <div class="field">
@@ -17,4 +32,7 @@
   </form>
   <p class="muted" style="margin-top:1rem"><a href="{% url 'login' %}">Start over</a></p>
 </div>
+{% endblock %}
+{% block script %}
+<script src="{% static 'mfa/mfa-keys.js' %}" defer></script>
 {% endblock %}
