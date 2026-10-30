@@ -61,8 +61,11 @@ def use_code(user, code: str) -> bool:
     )
     if candidate is None:
         return False
-    candidate.used_at = now()
-    candidate.save(update_fields=["used_at"])
+    # Spent by a conditional UPDATE, so two requests racing on one code cannot
+    # both get in with it.
+    spent = RecoveryCode.objects.filter(pk=candidate.pk, used_at__isnull=True).update(used_at=now())
+    if spent != 1:
+        return False
     _clear_totp_attempts(user)
     return True
 

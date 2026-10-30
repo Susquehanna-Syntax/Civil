@@ -155,14 +155,23 @@ def consume_totp(user, code: str, request=None) -> tuple[bool, str | None]:
         return False, "That code didn't match. Check your authenticator's clock and try again."
     _clear_totp_attempts(user)
 
-    if profile.last_totp_code == code and profile.last_totp_used_at:
-        elapsed = (now() - profile.last_totp_used_at).total_seconds()
-        if elapsed < _REPLAY_WINDOW_SECONDS:
-            return False, "That code was already used. Wait for the next one."
+    # Spend the code with one conditional UPDATE: of two requests racing on the
+    # same code, the database lets exactly one change the row.
+    from datetime import timedelta
 
+    from .models import MfaProfile
+
+    spent_at = now()
+    cutoff = spent_at - timedelta(seconds=_REPLAY_WINDOW_SECONDS)
+    updated = (
+        MfaProfile.objects.filter(pk=profile.pk)
+        .exclude(last_totp_code=code, last_totp_used_at__gte=cutoff)
+        .update(last_totp_code=code, last_totp_used_at=spent_at)
+    )
+    if updated != 1:
+        return False, "That code was already used. Wait for the next one."
     profile.last_totp_code = code
-    profile.last_totp_used_at = now()
-    profile.save(update_fields=["last_totp_code", "last_totp_used_at"])
+    profile.last_totp_used_at = spent_at
     return True, None
 
 

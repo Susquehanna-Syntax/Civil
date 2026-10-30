@@ -392,3 +392,44 @@ class BypassRegressionTests(TestCase):
         self.client.post(reverse("login"), {"username": "dave", "password": STRONG})
         for key in (views.FRESH_CODES_KEY, views.ENROL_KEY, views.OWNER_KEY):
             self.assertNotIn(key, self.client.session._session)
+
+
+class RaceTests(TestCase):
+    """A code or a recovery code is spent by one conditional UPDATE, so a
+    second request that read the same state a moment earlier loses."""
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("erin", password=STRONG)
+        enroll(self.user)
+
+    def test_a_code_spent_by_a_racing_request_is_refused(self):
+        from django.utils.timezone import now
+
+        from .totp import consume_totp
+
+        user = get_user_model().objects.get(pk=self.user.pk)
+        user.mfa  # this request has already read the profile
+        code = generate_totp(SECRET)
+        MfaProfile.objects.filter(user=user).update(last_totp_code=code, last_totp_used_at=now())
+        ok, err = consume_totp(user, code)
+        self.assertFalse(ok)
+        self.assertIn("already used", err)
+
+    def test_a_recovery_code_spent_by_a_racing_request_is_refused(self):
+        from unittest import mock
+
+        from django.utils.timezone import now
+
+        from . import recovery
+
+        code = make_codes(self.user)[0]
+        real_check = recovery.check_password
+
+        def check_then_lose_the_race(typed, hashed):
+            matched = real_check(typed, hashed)
+            if matched:
+                RecoveryCode.objects.filter(user=self.user).update(used_at=now())
+            return matched
+
+        with mock.patch.object(recovery, "check_password", side_effect=check_then_lose_the_race):
+            self.assertFalse(recovery.use_code(self.user, code))
