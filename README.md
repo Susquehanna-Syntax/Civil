@@ -70,6 +70,17 @@ Turnstil): it verifies locally against the cached key, maps `sub` to a local
 account via a CivilIdentity row (local PKs never change, existing usernames
 are never auto-claimed), and runs its own normal Django session from there.
 
+## Two-factor sign-in
+
+Every Civil sign-in, `/admin/` included, needs a second factor after the
+password: a six-digit code from an authenticator app, a security key or
+passkey tap, or one of ten one-time recovery codes. Someone without a factor
+sets an authenticator up during their first sign-in and sees their recovery
+codes once. Keys and passkeys are added on the Security page and need
+`MFA_PUBLIC_URL` set to the https address people use. Staff can reset a
+person's two-factor sign-in from that person's page in the console. Because
+Civil always asks, apps treat a Civil sign-in as already two-factor.
+
 ## Security notes
 
 - The JWT keypair is generated at Civil's first boot and lives in the DB —

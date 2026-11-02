@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "apps.identity",
+    "apps.mfa",
 ]
 
 AUTH_USER_MODEL = "identity.User"
@@ -93,6 +94,20 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/"
+
+# -- Two-factor sign-in (apps/mfa). Read by apps/mfa/conf.py with defaults, so
+# an install can change the rule without touching the app's code.
+MFA_ISSUER = "Civil"
+# The address this install is opened at, e.g. "https://civil.example.com".
+# Security keys (WebAuthn) are bound to it and never to the Host header; empty
+# means keys are unavailable here. Read by apps/mfa/keys.py through conf.py.
+MFA_PUBLIC_URL = os.environ.get("MFA_PUBLIC_URL", "")
+# The name an authenticator shows for this site. Defaults to MFA_ISSUER.
+MFA_RP_NAME = "Civil"
+MFA_REQUIRED = "apps.mfa.policy.everyone"
+# Auth backends whose sign-in already proved a second factor. Empty for Civil:
+# there is only the password form. Jackil lists its Civil and SAML backends.
+MFA_TRUSTED_BACKENDS = ()
 LOGOUT_REDIRECT_URL = "/login/"
 
 SESSION_COOKIE_SECURE = not DEBUG
