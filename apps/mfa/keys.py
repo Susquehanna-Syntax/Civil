@@ -27,13 +27,12 @@ alone, so no header can enrol a key for a domain nobody configured.
 from __future__ import annotations
 
 import hashlib
-from datetime import timedelta
 import json
 import secrets
 import time
+from datetime import timedelta
 from urllib.parse import urlsplit
 
-from django.core.cache import cache
 from django.utils.timezone import now
 from webauthn import (
     generate_authentication_options,
